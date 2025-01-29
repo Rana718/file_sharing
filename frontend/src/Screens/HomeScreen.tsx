@@ -1,8 +1,11 @@
 import { Feature } from '@/constant';
 import { motion } from 'framer-motion';
 import { FiSend, FiDownload } from 'react-icons/fi';
+import { useNavigate } from 'react-router-dom';
 
 function HomeScreen() {
+    const router = useNavigate();
+
     return (
         <div className="min-h-screen bg-[#0E0E0E] text-[#D9D9D9]">
             <nav className="border-b border-[#FFD700]/10 px-8 py-4">
@@ -30,6 +33,7 @@ function HomeScreen() {
                         <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
+                            onClick={() => router('/send')}
                             className="flex items-center justify-center gap-2 px-8 py-4 bg-[#FFD700] text-[#0E0E0E] rounded-lg font-semibold hover:bg-[#B8860B] transition-colors"
                         >
                             <FiSend /> Send Files
