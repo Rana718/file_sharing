@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiDownload, FiRefreshCw, FiArrowLeft, FiCheckCircle, FiFile } from 'react-icons/fi';
+import { base64ToUint8Array } from '@/utils/encoding';
+import { formatFileSize } from '@/utils';
 
 function ReceivedScreen() {
     const { roomID } = useParams();
@@ -14,15 +16,29 @@ function ReceivedScreen() {
     const [downloadStarted, setDownloadStarted] = useState(false);
     const [connecting, setConnecting] = useState(true);
     const navigate = useNavigate();
+    const receivedChunksRef = useRef([]);
 
     useEffect(() => {
         if (socket) {
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                if (data.type === "file") {
-                    setReceivedFile(data.fileData);
+                if (data.type === "file_info") {
                     setFileName(data.fileName);
                     setFileType(data.fileType);
+                    receivedChunksRef.current = [];
+                } else if (data.type === "file_chunk") {
+                    const chunkArray = base64ToUint8Array(data.fileData);
+                    //@ts-expect-error
+                    receivedChunksRef.current.push(chunkArray);
+
+                    if (data.isLastChunk) {
+                        const completeFile = new Blob(receivedChunksRef.current, { type: fileType });
+                        setReceivedFile(URL.createObjectURL(completeFile));
+                    }
+                } else if (data.type === "room_closed") {
+                    alert("Host has disconnected. Room closed.");
+                    receivedChunksRef.current = [];
+                    setSocket(null);
                 }
             };
 
@@ -70,13 +86,6 @@ function ReceivedScreen() {
         }
     };
 
-    const formatFileSize = (base64String: string) => {
-        const sizeInBytes = (base64String.length * 3) / 4;
-        if (sizeInBytes < 1024) return `${sizeInBytes} B`;
-        if (sizeInBytes < 1024 * 1024) return `${(sizeInBytes / 1024).toFixed(1)} KB`;
-        return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
-    };
-
     const handleDownload = () => {
         if (!receivedFile) return;
         setDownloadStarted(true);
@@ -90,7 +99,7 @@ function ReceivedScreen() {
                 animate={{ opacity: 1 }}
                 className="max-w-2xl mx-auto"
             >
-                <button 
+                <button
                     onClick={() => navigate('/')}
                     className="flex items-center gap-2 text-[#FFD700] hover:text-[#B8860B] mb-8 transition-colors"
                 >
