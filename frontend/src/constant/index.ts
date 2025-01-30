@@ -5,7 +5,15 @@ const Feature = [
     { title: "Quick & Easy", desc: "Simple interface for hassle-free file sharing" }
 ]
 
+const FormatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
+};
+
 
 export {
-    Feature
+    Feature,
+    FormatFileSize
 }

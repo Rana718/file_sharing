@@ -74,23 +74,34 @@ function SendScreen() {
 
     const SendFile = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files?.[0];
-        console.log(files)
 
         if (!files || !socket) return;
+        
+        // Clear any previous errors
+        setError("");
 
         const reader = new FileReader();
         reader.onload = () => {
-            const base64File = (reader.result as string).split(",")[1];
-            socket.send(
-                JSON.stringify({
-                    type: "file",
-                    roomId,
-                    fileData: base64File,
-                    fileName: files.name,
-                    fileType: files.type,
-                })
-            )
-        }
+            try {
+                const base64File = (reader.result as string).split(",")[1];
+                socket.send(
+                    JSON.stringify({
+                        type: "file",
+                        roomId,
+                        fileData: base64File,
+                        fileName: files.name,
+                        fileType: files.type,
+                    })
+                );
+            } catch (err) {
+                setError("Failed to process file. Please try again.");
+            }
+        };
+
+        reader.onerror = () => {
+            setError("Failed to read file. Please try again.");
+        };
+
         reader.readAsDataURL(files);
     }
 
