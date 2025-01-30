@@ -23,6 +23,7 @@ func CreateRoom(host *websocket.Conn) {
 		ID:      roomID,
 		Host:    host,
 		Clients: make(map[*websocket.Conn]bool),
+		FileChunks: make([][]byte, 0),
 	}
 
 	roomsMu.Lock()
@@ -35,15 +36,14 @@ func CreateRoom(host *websocket.Conn) {
 	})
 }
 
-
 func JoinRoom(client *websocket.Conn, roomID string) {
 	roomsMu.Lock()
-	room, ok := rooms[roomID]
+	room, exists := rooms[roomID]
 	roomsMu.Unlock()
 
-	if !ok {
+	if !exists {
 		client.WriteJSON(Message{
-			Type: "error",
+			Type:     "error",
 			FileData: "Room not found",
 		})
 		return
@@ -51,42 +51,32 @@ func JoinRoom(client *websocket.Conn, roomID string) {
 
 	room.mu.Lock()
 	room.Clients[client] = true
-	fileData := string(room.FileData)
-	fileName := room.FileName
-	fileType := room.FileType
 	room.mu.Unlock()
-
-
-	if len(fileData) > 0 {
-		client.WriteJSON(Message{
-			Type:     "file_data",
-			FileData: base64.StdEncoding.EncodeToString(room.FileData),
-			FileName: fileName,
-			FileType: fileType,
-		})
-	}
 }
 
-func ShareFile(host *websocket.Conn, roomID string, fileData []byte, fileName, fileType string){
+func ShareFile(host *websocket.Conn, roomID string, fileData []byte, fileName, fileType string, chunkIndex, totalChunks int, isLastChunk bool) {
 	roomsMu.Lock()
 	room, ok := rooms[roomID]
 	roomsMu.Unlock()
 
-	if !ok || room.Host != host{
+	if !ok || room.Host != host {
 		return
 	}
 
 	room.mu.Lock()
-	room.FileData = fileData
+	room.FileChunks = append(room.FileChunks, fileData)
 	room.FileName = fileName
 	room.FileType = fileType
+	room.TotalChunks = totalChunks
 
 	for client := range room.Clients {
 		client.WriteJSON(Message{
-			Type:     "file",
-			FileData: base64.StdEncoding.EncodeToString(fileData),
-			FileName: fileName,
-			FileType: fileType,
+			Type:        "file_chunk",
+			RoomID:      roomID,
+			FileData:    base64.RawURLEncoding.EncodeToString(fileData),
+			ChunkIndex:  chunkIndex,
+			TotalChunks: totalChunks,
+			IsLastChunk: isLastChunk,
 		})
 	}
 	room.mu.Unlock()
