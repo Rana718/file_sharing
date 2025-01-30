@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiUpload, FiRefreshCw, FiCopy } from 'react-icons/fi';
+import { FiRefreshCw, FiCopy } from 'react-icons/fi';
+import UploadButton from '@/components/UploadButton';
 
 function SendScreen() {
     const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -73,6 +74,7 @@ function SendScreen() {
 
     const SendFile = (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = e.target.files?.[0];
+        console.log(files)
 
         if (!files || !socket) return;
 
@@ -185,22 +187,7 @@ function SendScreen() {
                         </div>
 
                         {isHost && (
-                            <div className="relative group">
-                                <input
-                                    type="file"
-                                    onChange={SendFile}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                                />
-                                <motion.div
-                                    whileHover={{ scale: 1.02 }}
-                                    className="bg-[#A020F0] text-[#D9D9D9] p-8 rounded-lg cursor-pointer
-                           flex flex-col items-center gap-4 border-2 border-dashed border-[#A020F0]/50"
-                                >
-                                    <FiUpload className="w-8 h-8" />
-                                    <p className="font-semibold">Click or drag files to upload</p>
-                                    <p className="text-sm opacity-75">Share files of any size</p>
-                                </motion.div>
-                            </div>
+                            <UploadButton SendFile={SendFile} />
                         )}
                     </motion.div>
                 )}
