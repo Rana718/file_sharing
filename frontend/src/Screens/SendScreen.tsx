@@ -138,7 +138,7 @@ function SendScreen() {
 
     return (
         <div className="min-h-screen bg-gradient-to-b from-[#0E0E0E] via-[#151515] to-[#1a1a1a] text-[#D9D9D9] p-6 relative overflow-hidden">
-            {/* Enhanced background effects */}
+           
             <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full filter blur-3xl animate-pulse" />
             <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#FFD700]/10 rounded-full filter blur-3xl animate-pulse delay-1000" />
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] bg-[#FFD700]/5 rounded-full filter blur-3xl animate-pulse delay-500" />
