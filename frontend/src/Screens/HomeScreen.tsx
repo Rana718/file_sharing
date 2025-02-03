@@ -1,8 +1,7 @@
 import { Feature } from '@/constant';
 import { motion } from 'framer-motion';
-import { FiSend } from 'react-icons/fi';
+import { FiDownload, FiSend } from 'react-icons/fi';
 import { useNavigate } from 'react-router-dom';
-import { ReciveButton } from '@/components/ReciveButton';
 
 function HomeScreen() {
     const router = useNavigate();
@@ -39,7 +38,14 @@ function HomeScreen() {
                         >
                             <FiSend /> Send Files
                         </motion.button>
-                        <ReciveButton />
+                        <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className="flex items-center justify-center gap-2 px-8 py-4 bg-[#A020F0] text-[#D9D9D9] rounded-lg font-semibold hover:bg-[#8010C0] transition-colors"
+                            onClick={()=> router('/receive')}
+                        >
+                            <FiDownload /> Receive Files
+                        </motion.button>
                     </div>
                 </motion.div>
 

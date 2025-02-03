@@ -8,7 +8,7 @@ function App() {
     <Routes>
       <Route path="/" element={<HomeScreen />} />
       <Route path="/send" element={<SendScreen />} />
-      <Route path="/receive/:roomID" element={<ReceivedScreen/>} />
+      <Route path="/receive" element={<ReceivedScreen/>} />
     </Routes>
   );
 }

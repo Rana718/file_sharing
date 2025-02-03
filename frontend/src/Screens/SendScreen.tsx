@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FiRefreshCw, FiCopy } from 'react-icons/fi';
 import UploadButton from '@/components/UploadButton';
+import { arrayBufferToBase64 } from '@/utils/encoding';
 
 function SendScreen() {
     const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -10,6 +11,7 @@ function SendScreen() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string>("");
     const [copied, setCopied] = useState(false);
+    const CHUNK_SIZE = 64 * 1024;
 
     useEffect(() => {
         setIsLoading(true);
@@ -76,34 +78,54 @@ function SendScreen() {
         const files = e.target.files?.[0];
 
         if (!files || !socket) return;
-        
-        // Clear any previous errors
+
         setError("");
 
+        socket.send(
+            JSON.stringify({
+                type: "file_info",
+                roomId,
+                fileName: files.name,
+                fileType: files.type,
+            })
+        );
+
         const reader = new FileReader();
-        reader.onload = () => {
+        let offset = 0;
+
+        reader.onload = (e) => {
             try {
-                const base64File = (reader.result as string).split(",")[1];
+                const chunk = e.target?.result as ArrayBuffer;
+                const base64Chunk = arrayBufferToBase64(chunk);
+                const isLastChunk = offset + chunk.byteLength >= files.size;
+
                 socket.send(
                     JSON.stringify({
-                        type: "file",
+                        type: "file_chunk",
                         roomId,
-                        fileData: base64File,
-                        fileName: files.name,
-                        fileType: files.type,
+                        fileData: base64Chunk,
+                        isLastChunk,
                     })
                 );
+
+                offset += chunk.byteLength;
+                if (!isLastChunk) {
+                    readNextChunk();
+                }
             } catch (err) {
                 setError("Failed to process file. Please try again.");
             }
         };
-
-        reader.onerror = () => {
-            setError("Failed to read file. Please try again.");
+        const readNextChunk = () => {
+            const slice = files.slice(offset, offset + CHUNK_SIZE);
+            reader.readAsArrayBuffer(slice);
         };
 
-        reader.readAsDataURL(files);
-    }
+        readNextChunk();
+
+    };
+
+
 
     const copyRoomId = async () => {
         try {
