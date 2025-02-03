@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { FiRefreshCw, FiCopy } from 'react-icons/fi';
 import UploadButton from '@/components/UploadButton';
 import { arrayBufferToBase64 } from '@/utils/encoding';
+import { FileChunkMessage } from '@/types';
 
 function SendScreen() {
     const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -75,52 +76,56 @@ function SendScreen() {
     }
 
     const SendFile = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files?.[0];
+        const file = e.target.files?.[0];
 
-        if (!files || !socket) return;
+        if (!file || !socket) return;
 
         setError("");
 
-        socket.send(
-            JSON.stringify({
-                type: "file_info",
-                roomId,
-                fileName: files.name,
-                fileType: files.type,
-            })
-        );
-
         const reader = new FileReader();
         let offset = 0;
+        let chunkIndex = 0;
+        const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+        const readNextChunk = () => {
+            const slice = file.slice(offset, offset + CHUNK_SIZE);
+            reader.readAsArrayBuffer(slice);
+        };
 
         reader.onload = (e) => {
             try {
                 const chunk = e.target?.result as ArrayBuffer;
                 const base64Chunk = arrayBufferToBase64(chunk);
-                const isLastChunk = offset + chunk.byteLength >= files.size;
+                const isLastChunk = offset + chunk.byteLength >= file.size;
 
-                socket.send(
-                    JSON.stringify({
-                        type: "file_chunk",
-                        roomId,
-                        fileData: base64Chunk,
-                        isLastChunk,
-                    })
-                );
+                const message: FileChunkMessage = {
+                    type: "file_chunk",
+                    roomId,
+                    fileData: base64Chunk,
+                    chunkIndex: chunkIndex,
+                    totalChunks: totalChunks,
+                    isLastChunk: isLastChunk,
+                };
+
+                if (chunkIndex === 0) {
+                    message.fileName = file.name;
+                    message.fileType = file.type;
+                    message.fileSize = file.size;
+                    message.isFirstChunk = true;
+                }
+
+                socket.send(JSON.stringify(message));
 
                 offset += chunk.byteLength;
+                chunkIndex++;
                 if (!isLastChunk) {
                     readNextChunk();
                 }
+
             } catch (err) {
                 setError("Failed to process file. Please try again.");
             }
         };
-        const readNextChunk = () => {
-            const slice = files.slice(offset, offset + CHUNK_SIZE);
-            reader.readAsArrayBuffer(slice);
-        };
-
         readNextChunk();
 
     };
