@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FiDownload, FiRefreshCw, FiArrowLeft, FiCheckCircle, FiFile } from 'react-icons/fi';
+import { FiDownload, FiRefreshCw, FiArrowLeft, FiFile } from 'react-icons/fi';
 import { base64ToUint8Array } from '@/utils/encoding';
 import { formatFileSize } from '@/utils';
 
@@ -13,7 +13,7 @@ function ReceivedScreen() {
     const [error, setError] = useState("");
     const [receivedFile, setReceivedFile] = useState<string | null>(null);
     const [fileName, setFileName] = useState<string>("");
-    const [fileType, setFileType] = useState<string>("");
+    const [fileSize, setFileSize] = useState(0);
     const [connecting, setConnecting] = useState(false);
     const navigate = useNavigate();
     const receivedChunksRef = useRef<Uint8Array[]>([]);
@@ -29,20 +29,24 @@ function ReceivedScreen() {
                     return;
                 }
 
-                if (data.type === "file_info") {
-                    setFileName(data.fileName);
-                    setFileType(data.fileType);
-                    receivedChunksRef.current = [];
-                } else if (data.type === "file_chunk") {
+                if (data.type === "file_chunk") {
+
+                    if (data.isFirstChunk) {
+                        setFileName(data.fileName);
+                        setFileSize(data.fileSize);
+                        receivedChunksRef.current = [];
+                    }
+
                     const chunkArray = base64ToUint8Array(data.fileData);
                     receivedChunksRef.current.push(chunkArray);
 
                     if (data.isLastChunk) {
                         const completeFile = new Blob(receivedChunksRef.current, {
-                            type: fileType,
+                            type: data.fileType
                         });
                         setReceivedFile(URL.createObjectURL(completeFile));
                     }
+
                 } else if (data.type === "room_closed") {
                     alert("Host has disconnected. Room closed.");
                     receivedChunksRef.current = [];
@@ -88,7 +92,6 @@ function ReceivedScreen() {
         setRoomID(['', '', '', '', '', '']);
         setReceivedFile(null);
         setFileName("");
-        setFileType("");
         inputRefs.current[0]?.focus();
     };
 
@@ -246,7 +249,7 @@ function ReceivedScreen() {
                                         <div className="text-left">
                                             <h3 className="font-semibold text-xl">{fileName}</h3>
                                             <p className="text-[#D9D9D9]/60">
-                                                {formatFileSize(receivedFile)}
+                                                {formatFileSize(fileSize)}
                                             </p>
                                         </div>
                                     </div>
@@ -259,17 +262,8 @@ function ReceivedScreen() {
                                         whileHover={{ scale: 1.05 }}
                                         whileTap={{ scale: 0.95 }}
                                     >
-                                        {receivedFile ? (
-                                            <>
-                                                <FiCheckCircle />
-                                                Downloaded
-                                            </>
-                                        ) : (
-                                            <>
-                                                <FiDownload />
-                                                Download File
-                                            </>
-                                        )}
+                                        <FiDownload />
+                                        Download File
                                     </motion.a>
                                 </motion.div>
                             ) : (

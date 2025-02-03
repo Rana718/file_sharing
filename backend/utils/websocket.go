@@ -17,19 +17,22 @@ type Room struct {
 	FileChunks  [][]byte
 	FileName    string
 	FileType    string
+	FileSize    int
 	TotalChunks int
 	mu          sync.Mutex
 }
 
 type Message struct {
-	Type        string `json:"type"`
-	RoomID      string `json:"roomId,omitempty"`
-	FileData    string `json:"fileData,omitempty"`
-	FileName    string `json:"fileName,omitempty"`
-	FileType    string `json:"fileType,omitempty"`
-	ChunkIndex  int    `json:"chunkIndex,omitempty"`
-	TotalChunks int    `json:"totalChunks,omitempty"`
-	IsLastChunk bool   `json:"isLastChunk,omitempty"`
+	Type         string `json:"type"`
+	RoomID       string `json:"roomId,omitempty"`
+	FileData     string `json:"fileData,omitempty"`
+	FileName     string `json:"fileName,omitempty"`
+	FileType     string `json:"fileType,omitempty"`
+	FileSize     int    `json:"fileSize,omitempty"`
+	ChunkIndex   int    `json:"chunkIndex,omitempty"`
+	TotalChunks  int    `json:"totalChunks,omitempty"`
+	IsLastChunk  bool   `json:"isLastChunk,omitempty"`
+	IsFirstChunk bool   `json:"isFirstChunk,omitempty"`
 }
 
 var (
@@ -57,6 +60,7 @@ func HandeleWebSocket(w http.ResponseWriter, r *http.Request) {
 		err := conn.ReadJSON(&msg)
 
 		if err != nil {
+			handleDisconnect(conn)
 			log.Println(err)
 			break
 		}
@@ -68,23 +72,12 @@ func HandeleWebSocket(w http.ResponseWriter, r *http.Request) {
 		case "join":
 			JoinRoom(conn, msg.RoomID)
 
-		case "file_info":
-			roomsMu.Lock()
-			room, exists := rooms[msg.RoomID]
-			roomsMu.Unlock()
-
-			if exists {
-				room.FileName = msg.FileName
-				room.FileType = msg.FileType
-				room.FileChunks = make([][]byte, 0)
-			}
-
 		case "file_chunk":
 			fileDataStr := msg.FileData
 			fileDataStr = strings.ReplaceAll(fileDataStr, "-", "+")
 			fileDataStr = strings.ReplaceAll(fileDataStr, "_", "/")
 
-			if padding := len(fileDataStr) % 4; padding > 0 {
+			if padding := len(fileDataStr) % 4; padding != 0 {
 				fileDataStr += strings.Repeat("=", 4-padding)
 			}
 
@@ -94,7 +87,8 @@ func HandeleWebSocket(w http.ResponseWriter, r *http.Request) {
 				log.Println("Error decoding file chunk:", err)
 				continue
 			}
-			ShareFile(conn, msg.RoomID, fileData, msg.FileName, msg.FileType, msg.ChunkIndex, msg.TotalChunks, msg.IsLastChunk)
+
+			ReceiveFileChunk(conn, msg.RoomID, fileData, msg.FileName, msg.FileType, msg.FileSize, msg.ChunkIndex, msg.TotalChunks, msg.IsLastChunk, msg.IsFirstChunk)
 		}
 	}
 }
@@ -111,8 +105,9 @@ func handleDisconnect(conn *websocket.Conn) {
 				client.WriteJSON(Message{Type: "room_closed"})
 				client.Close()
 			}
-			room.mu.Unlock()
+
 			delete(rooms, roomID)
+			room.mu.Unlock()
 			return
 		}
 

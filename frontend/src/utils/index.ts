@@ -1,9 +1,14 @@
-const formatFileSize = (base64String: string) => {
-    const sizeInBytes = (base64String.length * 3) / 4;
-    if (sizeInBytes < 1024) return `${sizeInBytes} B`;
-    if (sizeInBytes < 1024 * 1024) return `${(sizeInBytes / 1024).toFixed(1)} KB`;
-    return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
-};
+const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
 
+    const sizeInKB = bytes / 1024;
+    if (sizeInKB < 1024) return `${sizeInKB.toFixed(2)} KB`;
+
+    const sizeInMB = sizeInKB / 1024;
+    if (sizeInMB < 1024) return `${sizeInMB.toFixed(2)} MB`;
+
+    const sizeInGB = sizeInMB / 1024;
+    return `${sizeInGB.toFixed(2)} GB`;
+};
 
 export { formatFileSize };

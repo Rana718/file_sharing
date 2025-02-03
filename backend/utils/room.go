@@ -2,7 +2,6 @@ package websockets
 
 import (
 	"encoding/base64"
-	"fmt"
 	"math/rand"
 
 	"github.com/gorilla/websocket"
@@ -19,8 +18,6 @@ func generateRoomID() string {
 
 func CreateRoom(host *websocket.Conn) {
 	roomID := generateRoomID()
-
-	fmt.Println("Creating room", roomID)
 
 	room := &Room{
 		ID:         roomID,
@@ -57,7 +54,7 @@ func JoinRoom(client *websocket.Conn, roomID string) {
 	room.mu.Unlock()
 }
 
-func ShareFile(host *websocket.Conn, roomID string, fileData []byte, fileName, fileType string, chunkIndex, totalChunks int, isLastChunk bool) {
+func ReceiveFileChunk(host *websocket.Conn, roomID string, fileData []byte, fileName, fileType string, fileSize, chunkIndex, totalChunks int, isLastChunk, isFirstChunk bool) {
 	roomsMu.Lock()
 	room, ok := rooms[roomID]
 	roomsMu.Unlock()
@@ -67,20 +64,34 @@ func ShareFile(host *websocket.Conn, roomID string, fileData []byte, fileName, f
 	}
 
 	room.mu.Lock()
+	if isFirstChunk {
+		room.FileName = fileName
+		room.FileType = fileType
+		room.FileSize = fileSize
+		room.FileChunks = make([][]byte, 0)
+	}
+
 	room.FileChunks = append(room.FileChunks, fileData)
-	room.FileName = fileName
-	room.FileType = fileType
 	room.TotalChunks = totalChunks
+	room.mu.Unlock()
 
 	for client := range room.Clients {
-		client.WriteJSON(Message{
+		msg := Message{
 			Type:        "file_chunk",
 			RoomID:      roomID,
 			FileData:    base64.RawURLEncoding.EncodeToString(fileData),
 			ChunkIndex:  chunkIndex,
 			TotalChunks: totalChunks,
 			IsLastChunk: isLastChunk,
-		})
+		}
+
+		if isFirstChunk {
+			msg.FileName = fileName
+			msg.FileType = fileType
+			msg.FileSize = fileSize
+			msg.IsFirstChunk = true
+		}
+
+		client.WriteJSON(msg)
 	}
-	room.mu.Unlock()
 }
