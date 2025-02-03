@@ -4,6 +4,7 @@ import { FiRefreshCw, FiCopy } from 'react-icons/fi';
 import UploadButton from '@/components/UploadButton';
 import { arrayBufferToBase64 } from '@/utils/encoding';
 import { FileChunkMessage } from '@/types';
+import { Lightbulb } from "lucide-react";
 
 function SendScreen() {
     const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -11,23 +12,29 @@ function SendScreen() {
     const [isHost, setIsHost] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string>("");
+    const [participantsCount, setParticipantsCount] = useState(0);
     const [copied, setCopied] = useState(false);
     const CHUNK_SIZE = 64 * 1024;
 
+
     useEffect(() => {
         setIsLoading(true);
-        try {
-            CreateRoom();
-        } catch (err) {
-            console.error(err);
-        }
-        finally {
-            setIsLoading(false);
-        }
+        CreateRoom();
         return () => {
             if (socket) socket.close();
         };
     }, []);
+
+
+    const handleMessage = (event: MessageEvent) => {
+        const data = JSON.parse(event.data);
+        if (data.type === "room_created") {
+            setRoomId(data.roomId);
+            setIsHost(true);
+        } else if (data.type === "participants_count") {
+            setParticipantsCount(data.Participants || 0);
+        }
+    };
 
     const handleError = (message: string) => {
         setError(message);
@@ -40,11 +47,11 @@ function SendScreen() {
     const ConnectWebSocket = () => {
         return new Promise<WebSocket>((resolve, reject) => {
             const ws = new WebSocket(import.meta.env.VITE_SERVER_URL);
-
             ws.onopen = () => {
                 setError("");
                 console.log("Connected to WebSocket");
                 setSocket(ws);
+                ws.onmessage = handleMessage;
                 resolve(ws);
             };
 
@@ -53,31 +60,22 @@ function SendScreen() {
                 reject(error);
             };
         });
-    }
+    };
 
     const CreateRoom = async () => {
         setIsLoading(true);
         try {
             const ws = await ConnectWebSocket();
             ws.send(JSON.stringify({ type: "create" }));
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                if (data.type === "room_created") {
-                    setRoomId(data.roomId);
-                    setIsHost(true);
-                }
-            }
         } catch (err) {
             console.error(err);
-        }
-        finally {
+        } finally {
             setIsLoading(false);
         }
-    }
+    };
 
     const SendFile = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-
         if (!file || !socket) return;
 
         setError("");
@@ -121,16 +119,12 @@ function SendScreen() {
                 if (!isLastChunk) {
                     readNextChunk();
                 }
-
             } catch (err) {
                 setError("Failed to process file. Please try again.");
             }
         };
         readNextChunk();
-
     };
-
-
 
     const copyRoomId = async () => {
         try {
@@ -143,18 +137,34 @@ function SendScreen() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0E0E0E] text-[#D9D9D9] p-6">
+        <div className="min-h-screen bg-gradient-to-b from-[#0E0E0E] via-[#151515] to-[#1a1a1a] text-[#D9D9D9] p-6 relative overflow-hidden">
+            {/* Enhanced background effects */}
+            <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full filter blur-3xl animate-pulse" />
+            <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#FFD700]/10 rounded-full filter blur-3xl animate-pulse delay-1000" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40rem] h-[40rem] bg-[#FFD700]/5 rounded-full filter blur-3xl animate-pulse delay-500" />
+
             <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="max-w-2xl mx-auto text-center"
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="max-w-2xl mx-auto text-center relative backdrop-blur-sm"
             >
-                <h1 className="text-4xl font-bold mb-6 bg-gradient-to-r from-[#FFD700] to-[#A020F0] bg-clip-text text-transparent">
+                <motion.h1
+                    initial={{ opacity: 0, y: -20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2, duration: 0.8 }}
+                    className="text-5xl font-bold mb-6 bg-gradient-to-r from-[#FFD700] via-[#FFA500] to-[#A020F0] bg-clip-text text-transparent"
+                >
                     Send Files Securely
-                </h1>
-                <p className="text-lg mb-8 text-[#D9D9D9]/80">
+                </motion.h1>
+                <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.4 }}
+                    className="text-xl mb-8 text-[#D9D9D9]/80"
+                >
                     Create a room and share the room ID with the recipient to start sharing files.
-                </p>
+                </motion.p>
 
                 <AnimatePresence>
                     {error && (
@@ -175,15 +185,24 @@ function SendScreen() {
                     )}
                 </AnimatePresence>
 
+
                 {!roomId ? (
                     <motion.button
-                        whileHover={{ scale: 1.05 }}
+                        whileHover={{ 
+                            scale: 1.05, 
+                            boxShadow: "0 0 30px rgba(255, 215, 0, 0.3)",
+                            textShadow: "0 0 10px rgba(255, 215, 0, 0.5)"
+                        }}
                         whileTap={{ scale: 0.95 }}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.6, duration: 0.3 }}
                         disabled={isLoading}
                         onClick={CreateRoom}
-                        className="bg-[#FFD700] text-[#0E0E0E] px-8 py-4 rounded-lg font-semibold 
-                     hover:bg-[#B8860B] transition-colors disabled:opacity-50 
-                     disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                        className="bg-gradient-to-r from-[#FFD700] via-[#FFA500] to-[#FFD700] text-[#0E0E0E] 
+                        px-8 py-4 rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 
+                        disabled:cursor-not-allowed flex items-center gap-2 mx-auto shadow-lg
+                        hover:bg-gradient-to-r hover:from-[#FFA500] hover:via-[#FFD700] hover:to-[#FFA500]"
                     >
                         {isLoading ? (
                             <FiRefreshCw className="w-5 h-5 animate-spin" />
@@ -193,25 +212,40 @@ function SendScreen() {
                     </motion.button>
                 ) : (
                     <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="space-y-6 p-6 bg-[#FFD700]/5 rounded-xl border border-[#FFD700]/10"
+                        initial={{ opacity: 0, scale: 0.95 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.4 }}
+                        className="space-y-6 p-8 bg-gradient-to-br from-[#FFD700]/10 to-transparent rounded-xl 
+                        border border-[#FFD700]/20 backdrop-blur-md shadow-2xl hover:border-[#FFD700]/30 
+                        transition-all duration-300"
                     >
-                        <div className="space-y-2">
-                            <p className="text-lg">Room ID:</p>
-                            <div className="flex items-center justify-center gap-2">
-                                <code className="bg-[#0E0E0E] px-4 py-2 rounded-lg font-mono text-[#FFD700]">
+                        <div className="space-y-3">
+                            <motion.p
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.2 }}
+                                className="text-xl font-medium"
+                            >
+                                Room ID:
+                            </motion.p>
+                            <motion.div
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.3 }}
+                                className="flex items-center justify-center gap-3"
+                            >
+                                <code className="bg-[#0E0E0E]/80 px-6 py-3 rounded-lg font-mono text-[#FFD700] text-lg shadow-inner">
                                     {roomId}
                                 </code>
                                 <motion.button
-                                    whileHover={{ scale: 1.1 }}
+                                    whileHover={{ scale: 1.1, rotate: 15 }}
                                     whileTap={{ scale: 0.9 }}
                                     onClick={copyRoomId}
-                                    className="text-[#FFD700] hover:text-[#B8860B] p-2"
+                                    className="text-[#FFD700] hover:text-[#FFA500] p-2 transition-colors duration-300"
                                 >
-                                    <FiCopy className="w-5 h-5" />
+                                    <FiCopy className="w-6 h-6" />
                                 </motion.button>
-                            </div>
+                            </motion.div>
                             {copied && (
                                 <motion.p
                                     initial={{ opacity: 0 }}
@@ -225,8 +259,38 @@ function SendScreen() {
                         </div>
 
                         {isHost && (
-                            <UploadButton SendFile={SendFile} />
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.4 }}
+                                className="space-y-4"
+                            >
+                                <UploadButton SendFile={SendFile} />
+                                <motion.p
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    transition={{ delay: 0.5 }}
+                                    className="text-lg"
+                                >
+                                    Participants: {" "}
+                                    <span className="font-bold text-[#FFD700]">{participantsCount}</span>
+                                </motion.p>
+                            </motion.div>
                         )}
+
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.6 }}
+                            className="mt-6 text-sm text-[#D9D9D9]/90 bg-gradient-to-r from-[#FFD700]/5 to-transparent p-5 rounded-lg 
+                            border border-[#FFD700]/20 flex items-start gap-3 hover:border-[#FFD700]/30 transition-all duration-300"
+                        >
+                            <Lightbulb className="w-5 h-5 text-[#FFD700] flex-shrink-0 mt-1" />
+                            <p className="text-left leading-relaxed">
+                                <span className="text-[#FFD700] font-medium">Note:</span>{' '}
+                                Peer-to-peer transfer! Data isn't stored on the backend. Ensure the receiver joins the room before sharing the file.
+                            </p>
+                        </motion.div>
                     </motion.div>
                 )}
             </motion.div>
