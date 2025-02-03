@@ -2,6 +2,7 @@ package websockets
 
 import (
 	"encoding/base64"
+	"fmt"
 	"math/rand"
 
 	"github.com/gorilla/websocket"
@@ -19,10 +20,12 @@ func generateRoomID() string {
 func CreateRoom(host *websocket.Conn) {
 	roomID := generateRoomID()
 
+	fmt.Println("Creating room", roomID)
+
 	room := &Room{
-		ID:      roomID,
-		Host:    host,
-		Clients: make(map[*websocket.Conn]bool),
+		ID:         roomID,
+		Host:       host,
+		Clients:    make(map[*websocket.Conn]bool),
 		FileChunks: make([][]byte, 0),
 	}
 

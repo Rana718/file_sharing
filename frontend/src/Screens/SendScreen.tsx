@@ -88,15 +88,14 @@ function SendScreen() {
                 fileName: files.name,
                 fileType: files.type,
             })
-        )
+        );
 
         const reader = new FileReader();
         let offset = 0;
 
         reader.onload = (e) => {
             try {
-                const chunk = e.target?.result;
-                if (!(chunk instanceof ArrayBuffer)) return;
+                const chunk = e.target?.result as ArrayBuffer;
                 const base64Chunk = arrayBufferToBase64(chunk);
                 const isLastChunk = offset + chunk.byteLength >= files.size;
 
@@ -113,23 +112,19 @@ function SendScreen() {
                 if (!isLastChunk) {
                     readNextChunk();
                 }
-
             } catch (err) {
                 setError("Failed to process file. Please try again.");
             }
         };
-
-        reader.onerror = () => {
-            setError("Failed to read file. Please try again.");
-        };
-        
         const readNextChunk = () => {
             const slice = files.slice(offset, offset + CHUNK_SIZE);
             reader.readAsArrayBuffer(slice);
         };
 
         readNextChunk();
-    }
+
+    };
+
 
 
     const copyRoomId = async () => {
