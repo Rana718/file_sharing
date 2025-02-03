@@ -1,4 +1,4 @@
-import { FormatFileSize } from '@/constant';
+import { formatFileSize } from '@/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import React, { useState } from 'react';
 import { FiUpload, FiX, FiFile } from 'react-icons/fi';
@@ -74,7 +74,7 @@ function UploadButton({ SendFile }: UploadButtonProps) {
                                         transition={{ delay: 0.5 }}
                                         className="text-sm text-[#D9D9D9]/75"
                                     >
-                                        {FormatFileSize(selectedFile.size)}
+                                        {formatFileSize(selectedFile.size)}
                                     </motion.p>
                                 </div>
                             </div>
