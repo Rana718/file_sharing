@@ -134,17 +134,6 @@ function ReceivedScreen() {
             <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full filter blur-3xl animate-pulse" />
             <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#FFD700]/10 rounded-full filter blur-3xl animate-pulse delay-1000" />
 
-            {isRoomJoined && !error && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="fixed top-4 right-4 bg-[#FFD700]/10 p-4 rounded-lg backdrop-blur-md"
-                >
-                    <p className="text-[#FFD700]">Room ID: {roomID.join('')}</p>
-                    <p className="text-sm text-[#D9D9D9]/60">Connected</p>
-                </motion.div>
-            )}
-
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -193,7 +182,7 @@ function ReceivedScreen() {
                 {!isRoomJoined || error ? (
                     <InputBox roomID={roomID} connecting={connecting} handleJoinRoom={handleJoinRoom} setRoomID={setRoomID} inputRefs={inputRefs} />
                 ) : (
-                    <ReceiveCard receivedFile={receivedFile} fileName={fileName} fileSize={fileSize} progress={progress} totalChunks={totalChunks} receivedChunks={receivedChunks} transferStatus={transferStatus} />
+                    <ReceiveCard receivedFile={receivedFile} fileName={fileName} fileSize={fileSize} progress={progress} totalChunks={totalChunks} receivedChunks={receivedChunks} transferStatus={transferStatus} isRoomJoined={isRoomJoined} error={error} roomID={roomID} />
                 )}
             </motion.div>
 
@@ -211,5 +200,3 @@ function ReceivedScreen() {
 }
 
 export default ReceivedScreen;
-
-
