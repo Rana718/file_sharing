@@ -52,6 +52,8 @@ func JoinRoom(client *websocket.Conn, roomID string) {
 	room.mu.Lock()
 	room.Clients[client] = true
 	room.mu.Unlock()
+
+	UpdateParticipants(room)
 }
 
 func ReceiveFileChunk(host *websocket.Conn, roomID string, fileData []byte, fileName, fileType string, fileSize, chunkIndex, totalChunks int, isLastChunk, isFirstChunk bool) {

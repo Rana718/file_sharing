@@ -33,6 +33,7 @@ type Message struct {
 	TotalChunks  int    `json:"totalChunks,omitempty"`
 	IsLastChunk  bool   `json:"isLastChunk,omitempty"`
 	IsFirstChunk bool   `json:"isFirstChunk,omitempty"`
+	Participants int    `json:"participants,omitempty"`
 }
 
 var (
@@ -111,7 +112,21 @@ func handleDisconnect(conn *websocket.Conn) {
 			return
 		}
 
-		delete(room.Clients, conn)
+		if _, ok := room.Clients[conn]; ok{
+			delete(room.Clients, conn)
+			UpdateParticipants(room)
+		}
+
 		room.mu.Unlock()
+	}
+}
+
+func UpdateParticipants(room *Room) {
+	if room.Host != nil {
+		msg := Message{
+			Type:         "participants_count",
+			Participants: len(room.Clients),
+		}
+		room.Host.WriteJSON(msg)
 	}
 }

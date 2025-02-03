@@ -24,8 +24,10 @@ function ReceivedScreen() {
                 const data = JSON.parse(event.data);
 
                 if (data.type === "error") {
-                    handleError(data.message);
+                    handleError("Failed to join room. Please try again.");
                     setIsRoomJoined(false);
+                    alert("Failed to join room. Please try again.");
+                    setRoomID(['', '', '', '', '', '']);
                     return;
                 }
 
@@ -132,24 +134,35 @@ function ReceivedScreen() {
     };
 
     return (
-        <div className="min-h-screen bg-[#0E0E0E] text-[#D9D9D9] p-6">
+        <div className="min-h-screen bg-gradient-to-b from-[#0E0E0E] to-[#1a1a1a] text-[#D9D9D9] p-6 relative overflow-hidden">
+            {/* Background effects */}
+            <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full filter blur-3xl animate-pulse" />
+            <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#FFD700]/10 rounded-full filter blur-3xl animate-pulse delay-1000" />
+
             <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="max-w-2xl mx-auto"
+                className="max-w-2xl mx-auto relative backdrop-blur-sm"
             >
-                <button
+                <motion.button
+                    whileHover={{ x: -5 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => navigate('/')}
-                    className="flex items-center gap-2 text-[#FFD700] hover:text-[#B8860B] mb-8 transition-colors"
+                    className="flex items-center gap-2 text-[#FFD700] hover:text-[#B8860B] mb-8 transition-all duration-300"
                 >
-                    <FiArrowLeft /> Back to Home
-                </button>
+                    <FiArrowLeft className="animate-pulse" /> Back to Home
+                </motion.button>
 
-                <div className="text-center mb-8">
-                    <h1 className="text-4xl font-bold mb-4 bg-gradient-to-r from-[#FFD700] to-[#A020F0] bg-clip-text text-transparent">
+                <motion.div 
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.6 }}
+                    className="text-center mb-8"
+                >
+                    <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-[#FFD700] via-[#FFA500] to-[#A020F0] bg-clip-text text-transparent">
                         Receive Files
                     </h1>
-                </div>
+                </motion.div>
 
                 {error && (
                     <motion.div
@@ -172,30 +185,55 @@ function ReceivedScreen() {
                 )}
 
                 {!isRoomJoined || error ? (
-                    <div className="bg-[#FFD700]/5 rounded-xl border border-[#FFD700]/10 p-8">
+                    <motion.div 
+                        initial={{ scale: 0.95, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ duration: 0.4 }}
+                        className="bg-[#FFD700]/5 rounded-xl border border-[#FFD700]/20 p-8 backdrop-blur-md 
+                        shadow-xl hover:border-[#FFD700]/30 transition-all duration-300"
+                    >
                         <div className="flex flex-col items-center gap-4">
-                            <p className="text-lg mb-4">Enter 6-digit Room Code</p>
-                            <div className="flex gap-2 mb-4">
+                            <motion.p 
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                transition={{ delay: 0.2 }}
+                                className="text-xl font-medium"
+                            >
+                                Enter 6-digit Room Code
+                            </motion.p>
+                            <motion.div 
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: 0.3 }}
+                                className="flex gap-3 mb-6"
+                            >
                                 {[0, 1, 2, 3, 4, 5].map((index) => (
-                                    <input
+                                    <motion.input
                                         key={index}
+                                        initial={{ scale: 0.8 }}
+                                        animate={{ scale: 1 }}
+                                        transition={{ delay: 0.1 * index }}
                                         ref={(el) => (inputRefs.current[index] = el)}
                                         type="text"
                                         maxLength={1}
                                         value={roomID[index]}
                                         onChange={(e) => handleInputChange(index, e.target.value)}
                                         onKeyDown={(e) => handleKeyDown(index, e)}
-                                        className="w-12 h-12 text-center text-xl font-bold bg-[#1A1A1A] border-2 border-[#FFD700]/30 
-                                                 rounded-lg focus:border-[#FFD700] focus:outline-none text-[#FFD700]"
+                                        className="w-14 h-14 text-center text-2xl font-bold bg-[#1A1A1A] border-2 
+                                        border-[#FFD700]/30 rounded-lg focus:border-[#FFD700] focus:outline-none 
+                                        text-[#FFD700] shadow-inner transition-all duration-300
+                                        focus:shadow-[#FFD700]/20 focus:scale-110"
                                     />
                                 ))}
-                            </div>
-                            <button
+                            </motion.div>
+                            <motion.button
+                                whileHover={{ scale: 1.05, boxShadow: "0 0 20px rgba(160, 32, 240, 0.3)" }}
+                                whileTap={{ scale: 0.95 }}
                                 onClick={handleJoinRoom}
                                 disabled={roomID.join('').length !== 6 || connecting}
-                                className="bg-[#A020F0] text-[#D9D9D9] px-6 py-3 rounded-lg font-semibold 
-                                         hover:bg-[#8010C0] transition-colors disabled:opacity-50 
-                                         disabled:cursor-not-allowed flex items-center gap-2"
+                                className="bg-gradient-to-r from-[#A020F0] to-[#8010C0] text-white px-8 py-4 
+                                rounded-lg font-semibold transition-all duration-300 disabled:opacity-50 
+                                disabled:cursor-not-allowed flex items-center gap-3 shadow-lg"
                             >
                                 {connecting ? (
                                     <>
@@ -205,9 +243,9 @@ function ReceivedScreen() {
                                 ) : (
                                     'Join Room'
                                 )}
-                            </button>
+                            </motion.button>
                         </div>
-                    </div>
+                    </motion.div>
                 ) : (
                     <>
                         <AnimatePresence>
