@@ -5,6 +5,7 @@ import { FiRefreshCw, FiArrowLeft } from 'react-icons/fi';
 import { base64ToUint8Array } from '@/utils/encoding';
 import InputBox from '@/components/receive/InputBox';
 import ReceiveCard from '@/components/receive/ReceiveCard';
+import { Helmet } from 'react-helmet-async';
 
 
 function ReceivedScreen() {
@@ -129,74 +130,84 @@ function ReceivedScreen() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-b from-[#0E0E0E] to-[#1a1a1a] text-[#D9D9D9] p-6 relative overflow-hidden">
+        <>
+            <Helmet>
+                <title>PeerDrop | Receive Files</title>
+                <meta name="description" content="Receive files from a sender using a room code" />
+                <link rel='canonical' href='/receive'/>
+            </Helmet>
 
-            <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full filter blur-3xl animate-pulse" />
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#FFD700]/10 rounded-full filter blur-3xl animate-pulse delay-1000" />
+            <div className="min-h-screen bg-gradient-to-b from-[#0E0E0E] to-[#1a1a1a] text-[#D9D9D9] p-6 relative overflow-hidden">
 
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="max-w-2xl mx-auto relative backdrop-blur-sm"
-            >
-                <motion.button
-                    whileHover={{ x: -5 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => navigate('/')}
-                    className="flex items-center gap-2 text-[#FFD700] hover:text-[#B8860B] mb-8 transition-all duration-300"
-                >
-                    <FiArrowLeft className="animate-pulse" /> Back to Home
-                </motion.button>
+                <div className="absolute top-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full filter blur-3xl animate-pulse" />
+                <div className="absolute bottom-0 right-0 w-96 h-96 bg-[#FFD700]/10 rounded-full filter blur-3xl animate-pulse delay-1000" />
 
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6 }}
-                    className="text-center mb-8"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="max-w-2xl mx-auto relative backdrop-blur-sm"
                 >
-                    <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-[#FFD700] via-[#FFA500] to-[#A020F0] bg-clip-text text-transparent">
-                        Receive Files
-                    </h1>
+                    <motion.button
+                        whileHover={{ x: -5 }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => navigate('/')}
+                        className="flex items-center gap-2 text-[#FFD700] hover:text-[#B8860B] mb-8 transition-all duration-300"
+                    >
+                        <FiArrowLeft className="animate-pulse" /> Back to Home
+                    </motion.button>
+
+                    <motion.div
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.6 }}
+                        className="text-center mb-8"
+                    >
+                        <h1 className="text-5xl font-bold mb-4 bg-gradient-to-r from-[#FFD700] via-[#FFA500] to-[#A020F0] bg-clip-text text-transparent">
+                            Receive Files
+                        </h1>
+                    </motion.div>
+
+                    {error && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0 }}
+                            className="bg-[#3E0000] text-[#FF0000] p-4 rounded-lg mb-6"
+                        >
+                            <div className="flex flex-col items-center gap-4">
+                                <span>{error}</span>
+                                <button
+                                    onClick={resetRoom}
+                                    className="bg-[#FF0000]/20 hover:bg-[#FF0000]/30 text-[#FF0000] 
+                                         px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                                >
+                                    <FiRefreshCw /> Try Again
+                                </button>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {!isRoomJoined || error ? (
+                        <InputBox roomID={roomID} connecting={connecting} handleJoinRoom={handleJoinRoom} setRoomID={setRoomID} inputRefs={inputRefs} />
+                    ) : (
+                        <ReceiveCard receivedFile={receivedFile} fileName={fileName} fileSize={fileSize} progress={progress} totalChunks={totalChunks} receivedChunks={receivedChunks} transferStatus={transferStatus} isRoomJoined={isRoomJoined} error={error} roomID={roomID} />
+                    )}
                 </motion.div>
 
-                {error && (
-                    <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0 }}
-                        className="bg-[#3E0000] text-[#FF0000] p-4 rounded-lg mb-6"
-                    >
-                        <div className="flex flex-col items-center gap-4">
-                            <span>{error}</span>
-                            <button
-                                onClick={resetRoom}
-                                className="bg-[#FF0000]/20 hover:bg-[#FF0000]/30 text-[#FF0000] 
-                                         px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                            >
-                                <FiRefreshCw /> Try Again
-                            </button>
-                        </div>
-                    </motion.div>
-                )}
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.5 }}
+                    className="mt-8 text-center text-[#D9D9D9]/60"
+                >
+                    <p>Keep this tab open while waiting for files</p>
+                    <p className="text-sm mt-2">Files are transferred securely peer-to-peer</p>
+                </motion.div>
+            </div>
 
-                {!isRoomJoined || error ? (
-                    <InputBox roomID={roomID} connecting={connecting} handleJoinRoom={handleJoinRoom} setRoomID={setRoomID} inputRefs={inputRefs} />
-                ) : (
-                    <ReceiveCard receivedFile={receivedFile} fileName={fileName} fileSize={fileSize} progress={progress} totalChunks={totalChunks} receivedChunks={receivedChunks} transferStatus={transferStatus} isRoomJoined={isRoomJoined} error={error} roomID={roomID} />
-                )}
-            </motion.div>
-
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5 }}
-                className="mt-8 text-center text-[#D9D9D9]/60"
-            >
-                <p>Keep this tab open while waiting for files</p>
-                <p className="text-sm mt-2">Files are transferred securely peer-to-peer</p>
-            </motion.div>
-        </div>
+        </>
     );
+
 }
 
 export default ReceivedScreen;
