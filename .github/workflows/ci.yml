@@ -51,7 +51,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '16'
+          node-version: '22'
+
+      - name: Install pnpm
+        working-directory: ./frontend
+        run: npm install -g pnpm
+
 
       - name: Install dependencies and build frontend
         working-directory: ./frontend
