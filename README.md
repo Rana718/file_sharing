@@ -1,4 +1,4 @@
-```markdown
+
 # 🚀 PeerDrop - Secure File Sharing Platform
 
 PeerDrop is a modern, secure, and easy-to-use file sharing platform featuring real-time, peer-to-peer transfers with end-to-end encryption. Built to ensure your files are shared safely and swiftly, PeerDrop is split into two main parts: a **Frontend** built with React and TypeScript, and a **Backend** written in Go to power real-time communication via WebSockets. Enjoy a seamless experience whether you're sharing sensitive documents or your latest creative project! 🔒💻
@@ -129,4 +129,3 @@ This project is licensed under the [MIT License](LICENSE). Feel free to use, mod
 ---
 
 Happy coding and secure file sharing! 🎉🚀🔒
-```
