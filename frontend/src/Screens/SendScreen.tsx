@@ -32,7 +32,7 @@ function SendScreen() {
             setRoomId(data.roomId);
             setIsHost(true);
         } else if (data.type === "participants_count") {
-            setParticipantsCount(data.Participants || 0);
+            setParticipantsCount(data.participants || 0);
         }
     };
 
