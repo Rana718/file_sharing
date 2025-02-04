@@ -1,7 +1,8 @@
 package main
 
 import (
-	websockets "Server/utils"
+	"Server/utils"
+	"Server/websockets"
 	"log"
 	"math/rand"
 	"net/http"
@@ -10,18 +11,12 @@ import (
 	"github.com/rs/cors"
 )
 
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write([]byte(`{"message": "Hello from PeerDrop Server!"}`))
-}
-
 func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", websockets.HandeleWebSocket)
-	mux.HandleFunc("/hello", helloHandler)
+	mux.HandleFunc("/hello", utils.HelloHandler)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
