@@ -15,6 +15,7 @@ function SendScreen() {
     const [error, setError] = useState<string>("");
     const [participantsCount, setParticipantsCount] = useState(0);
     const [copied, setCopied] = useState(false);
+    const [isDisabled, setIsDisabled] = useState(true);
     const CHUNK_SIZE = 64 * 1024;
 
 
@@ -25,6 +26,14 @@ function SendScreen() {
             if (socket) socket.close();
         };
     }, []);
+
+    useEffect(() => {
+        if (participantsCount) {
+            setIsDisabled(false);
+        } else {
+            setIsDisabled(true);
+        }
+    }, [participantsCount]);
 
 
     const handleMessage = (event: MessageEvent) => {
@@ -273,7 +282,7 @@ function SendScreen() {
                                     transition={{ delay: 0.4 }}
                                     className="space-y-4"
                                 >
-                                    <UploadButton SendFile={SendFile} />
+                                    <UploadButton SendFile={SendFile} isDisabled={isDisabled} />
                                     <motion.p
                                         initial={{ opacity: 0 }}
                                         animate={{ opacity: 1 }}

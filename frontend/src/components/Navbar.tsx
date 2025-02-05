@@ -31,8 +31,7 @@ function Navbar() {
                                 animate={{ opacity: 1, x: 0 }}
                                 whileHover={{ scale: 1.05 }}
                                 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-[#FFD700] to-[#FFA500] 
-                                         bg-clip-text text-transparent hover:from-[#FFA500] hover:to-[#FFD700] 
-                                         transition-all duration-300"
+                                bg-clip-text text-transparent hover:from-[#FFA500] hover:to-[#FFD700] transition-all duration-300"
                             >
                                 PeerDrop
                             </motion.h1>
@@ -80,9 +79,8 @@ function Navbar() {
                                 target="_blank"
                                 whileHover={{ scale: 1.1, rotate: 5 }}
                                 whileTap={{ scale: 0.9 }}
-                                className="flex items-center gap-2 px-4 py-2 rounded-lg 
-                                         bg-gradient-to-r from-[#FFD700]/10 to-transparent 
-                                         hover:from-[#FFD700]/20 text-[#FFD700] transition-all duration-300"
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-gradient-to-r from-[#FFD700]/10 to-transparent 
+                                hover:from-[#FFD700]/20 text-[#FFD700] transition-all duration-300"
                             >
                                 <FiGithub size={20} />
                                 <span className="hidden sm:inline">GitHub</span>
@@ -120,10 +118,12 @@ function Navbar() {
                                         <Link
                                             to={item.path}
                                             onClick={() => setIsMenuOpen(false)}
-                                            className={`flex items-center gap-3 p-2 rounded-lg transition-colors
-                                                      ${location.pathname === item.path
-                                                    ? 'text-[#FFD700] bg-[#FFD700]/10'
-                                                    : 'text-[#D9D9D9] hover:text-[#FFD700]'}`}
+                                            className={`
+                                                flex items-center gap-3 p-2 rounded-lg transition-colors
+                                                ${location.pathname === item.path
+                                                ? 'text-[#FFD700] bg-[#FFD700]/10'
+                                                : 'text-[#D9D9D9] hover:text-[#FFD700]'}
+                                            `}
                                         >
                                             {item.icon}
                                             {item.label}

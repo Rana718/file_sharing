@@ -6,6 +6,7 @@ import FeatureCard from '@/components/home/FeatureCard';
 import Footer from '@/components/home/Footer';
 import { Icons } from '@/constant';
 import { Helmet } from 'react-helmet-async';
+import React from 'react';
 
 function HomeScreen() {
     const router = useNavigate();
@@ -80,14 +81,12 @@ function HomeScreen() {
                                 }}
                                 whileTap={{ scale: 0.95 }}
                                 onClick={() => router('/send')}
-                                className="group flex items-center justify-center gap-3 px-10 py-4 bg-gradient-to-r 
-                                     from-[#FFD700] to-[#FFA500] text-[#0E0E0E] rounded-lg font-semibold 
-                                     transition-all duration-300 shadow-lg relative overflow-hidden"
+                                className="group flex items-center justify-center gap-3 px-10 py-4 bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-[#0E0E0E] 
+                                rounded-lg font-semibold transition-all duration-300 shadow-lg relative overflow-hidden"
                             >
                                 <FiSend className="group-hover:rotate-12 transition-transform duration-300" />
                                 Send Files
-                                <span className="absolute inset-0 bg-white/20 transform -translate-x-full 
-                                         group-hover:translate-x-full transition-transform duration-700"></span>
+                                <span className="absolute inset-0 bg-white/20 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></span>
                             </motion.button>
 
                             <motion.button
@@ -103,8 +102,7 @@ function HomeScreen() {
                             >
                                 <FiDownload className="group-hover:-translate-y-1 transition-transform duration-300" />
                                 Receive Files
-                                <span className="absolute inset-0 bg-white/10 transform -translate-x-full 
-                                         group-hover:translate-x-full transition-transform duration-700"></span>
+                                <span className="absolute inset-0 bg-white/10 transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></span>
                             </motion.button>
                         </motion.div>
 
@@ -138,4 +136,4 @@ function HomeScreen() {
     );
 }
 
-export default HomeScreen;
+export default React.memo(HomeScreen);

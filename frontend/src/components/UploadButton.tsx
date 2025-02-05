@@ -5,9 +5,10 @@ import { FiUpload, FiX, FiFile } from 'react-icons/fi';
 
 interface UploadButtonProps {
     SendFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    isDisabled: boolean;
 }
 
-function UploadButton({ SendFile }: UploadButtonProps) {
+function UploadButton({ SendFile, isDisabled }: UploadButtonProps) {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const inputRef = React.useRef<HTMLInputElement>(null);
 
@@ -32,8 +33,9 @@ function UploadButton({ SendFile }: UploadButtonProps) {
                 ref={inputRef}
                 type="file"
                 onChange={handleFileChange}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10 disabled:cursor-not-allowed"
                 style={{ display: selectedFile ? 'none' : 'block' }}
+                disabled={isDisabled}
             />
             <AnimatePresence mode="wait">
                 {selectedFile ? (
@@ -42,9 +44,8 @@ function UploadButton({ SendFile }: UploadButtonProps) {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         className="bg-gradient-to-br from-[rgba(179,71,245,0.5)] to-[rgba(153,50,204,0.5)] text-[#D9D9D9] p-6 rounded-lg
-                                   border-2 border-dashed border-[#FFD700]/30 group-hover:border-[#FFD700]/50
-                                   shadow-lg shadow-[#B347F5]/20 backdrop-blur-sm transition-all duration-300
-                                   hover:from-[rgba(197,102,255,0.5)] hover:to-[rgba(170,92,228,0.5)]"
+                        border-2 border-dashed border-[#FFD700]/30 group-hover:border-[#FFD700]/50 shadow-lg shadow-[#B347F5]/20 
+                        backdrop-blur-sm transition-all duration-300 hover:from-[rgba(197,102,255,0.5)] hover:to-[rgba(170,92,228,0.5)]"
                     >
                         <motion.div
                             className="flex items-center justify-between"
@@ -82,8 +83,7 @@ function UploadButton({ SendFile }: UploadButtonProps) {
                                 whileHover={{ scale: 1.1, rotate: 90 }}
                                 whileTap={{ scale: 0.9 }}
                                 onClick={handleDelete}
-                                className="p-2 hover:bg-[#FFD700]/10 rounded-full transition-all duration-300
-                                           hover:shadow-lg hover:shadow-[#FFD700]/20"
+                                className="p-2 hover:bg-[#FFD700]/10 rounded-full transition-all duration-300 hover:shadow-lg hover:shadow-[#FFD700]/20"
                             >
                                 <FiX className="w-5 h-5" />
                             </motion.button>
@@ -94,22 +94,26 @@ function UploadButton({ SendFile }: UploadButtonProps) {
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         exit={{ opacity: 0, scale: 0.9 }}
-                        whileHover={{ scale: 1.02 }}
-                        className="relative bg-gradient-to-br from-[rgba(179,71,245,0.5)] to-[rgba(153,50,204,0.5)] p-8 rounded-lg cursor-pointer
-                                   flex flex-col items-center gap-4 border-2 border-dashed border-[#FFD700]/30 
-                                   group-hover:border-[#FFD700]/50 shadow-lg shadow-[#B347F5]/20 backdrop-blur-sm
-                                   transition-all duration-300 overflow-hidden hover:from-[rgba(197,102,255,0.5)] hover:to-[rgba(170,92,228,0.5)]"
+                        whileHover={{ scale: isDisabled ? 1 : 1.02 }}
+                        className={`
+                            relative bg-gradient-to-br from-[rgba(179,71,245,0.5)] to-[rgba(153,50,204,0.5)] p-8 rounded-lg flex flex-col items-center gap-4 
+                            border-2 border-dashed border-[#FFD700]/30 group-hover:border-[#FFD700]/50 shadow-lg shadow-[#B347F5]/20 backdrop-blur-sm
+                            transition-all duration-300 overflow-hidden ${isDisabled ? 'opacity-50 cursor-not-allowed' 
+                            : 'hover:from-[rgba(197,102,255,0.5)] hover:to-[rgba(170,92,228,0.5)] cursor-pointer'}
+                        `}
                     >
-                        <motion.div
-                            className="absolute inset-0 bg-gradient-to-r from-transparent via-[#FFD700]/10 to-transparent
-                                       -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
-                        />
+                        {!isDisabled && (
+                            <motion.div
+                                className="absolute inset-0 bg-gradient-to-r from-transparent via-[#FFD700]/10 to-transparent 
+                                -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
+                            />
+                        )}
 
                         <motion.div
-                            animate={{
+                            animate={!isDisabled ? {
                                 y: [0, -5, 0],
                                 scale: [1, 1.1, 1]
-                            }}
+                            } : {}}
                             transition={{
                                 duration: 2,
                                 repeat: Infinity,
@@ -126,7 +130,7 @@ function UploadButton({ SendFile }: UploadButtonProps) {
                                 transition={{ delay: 0.2 }}
                                 className="font-semibold text-lg"
                             >
-                                Click or drag files to upload
+                                {isDisabled ? "Waiting for participants..." : "Click or drag files to upload"}
                             </motion.p>
                             <motion.p
                                 initial={{ opacity: 0 }}
@@ -134,12 +138,22 @@ function UploadButton({ SendFile }: UploadButtonProps) {
                                 transition={{ delay: 0.3 }}
                                 className="text-sm text-[#D9D9D9]/75 mt-2"
                             >
-                                Share files of any size
+                                {isDisabled ? "Someone needs to join your room first" : "Share files of any size"}
                             </motion.p>
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {isDisabled && (
+                <motion.div
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 text-center text-[#FFD700] bg-[#FFD700]/10 p-3 rounded-lg border border-[#FFD700]/20 text-sm"
+                >
+                    ⚠️ Wait for participants to join before uploading files
+                </motion.div>
+            )}
         </div>
     );
 }

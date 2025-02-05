@@ -178,8 +178,7 @@ function ReceivedScreen() {
                                 <span>{error}</span>
                                 <button
                                     onClick={resetRoom}
-                                    className="bg-[#FF0000]/20 hover:bg-[#FF0000]/30 text-[#FF0000] 
-                                         px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+                                    className="bg-[#FF0000]/20 hover:bg-[#FF0000]/30 text-[#FF0000] px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
                                 >
                                     <FiRefreshCw /> Try Again
                                 </button>

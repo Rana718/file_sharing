@@ -96,8 +96,8 @@ function ReceiveCard({ transferStatus, fileName, fileSize, progress, receivedChu
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                        className="w-20 h-20 bg-gradient-to-br from-green-500/20 to-[#FFD700]/20 
-                             rounded-full mx-auto flex items-center justify-center backdrop-blur-sm"
+                        className="w-20 h-20 bg-gradient-to-br from-green-500/20 to-[#FFD700]/20 rounded-full mx-auto 
+                        flex items-center justify-center backdrop-blur-sm"
                     >
                         <FiDownload className="w-10 h-10 text-[#FFD700]" />
                     </motion.div>
@@ -116,10 +116,9 @@ function ReceiveCard({ transferStatus, fileName, fileSize, progress, receivedChu
                         <motion.a
                             href={receivedFile}
                             download={fileName}
-                            className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r 
-                                 from-[#A020F0] to-[#8010C0] text-white px-6 py-4 rounded-lg font-semibold 
-                                 shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 
-                                 transition-all duration-300"
+                            className="w-full inline-flex items-center justify-center gap-2 bg-gradient-to-r from-[#A020F0] to-[#8010C0] 
+                            text-white px-6 py-4 rounded-lg font-semibold shadow-lg shadow-purple-500/20 hover:shadow-purple-500/40 
+                            transition-all duration-300"
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                         >

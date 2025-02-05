@@ -1,5 +1,6 @@
 import { Feature } from '@/constant'
 import { motion } from 'framer-motion'
+import React from 'react'
 
 function FeatureCard() {
     return (
@@ -38,4 +39,4 @@ function FeatureCard() {
     )
 }
 
-export default FeatureCard
+export default React.memo(FeatureCard)
