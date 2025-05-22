@@ -17,6 +17,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", websockets.HandeleWebSocket)
 	mux.HandleFunc("/hello", utils.HelloHandler)
+	mux.HandleFunc("/health", utils.HelloHandler)
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
