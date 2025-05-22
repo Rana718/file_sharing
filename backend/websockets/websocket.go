@@ -14,7 +14,6 @@ type Room struct {
 	ID          string
 	Host        *websocket.Conn
 	Clients     map[*websocket.Conn]bool
-	FileChunks  [][]byte
 	FileName    string
 	FileType    string
 	FileSize    int
@@ -55,6 +54,8 @@ func HandeleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+
+	conn.SetReadLimit(1024 * 1024) 
 
 	for {
 		var msg Message
@@ -102,17 +103,20 @@ func handleDisconnect(conn *websocket.Conn) {
 		room.mu.Lock()
 
 		if room.Host == conn {
+			log.Printf("Host disconnected from room %s, closing room", roomID)
 			for client := range room.Clients {
 				client.WriteJSON(Message{Type: "room_closed"})
 				client.Close()
 			}
 
+			room.Clients = nil
 			delete(rooms, roomID)
 			room.mu.Unlock()
 			return
 		}
 
-		if _, ok := room.Clients[conn]; ok{
+		if _, ok := room.Clients[conn]; ok {
+			log.Printf("Client disconnected from room %s", roomID)
 			delete(room.Clients, conn)
 			UpdateParticipants(room)
 		}

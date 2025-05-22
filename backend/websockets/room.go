@@ -2,6 +2,7 @@ package websockets
 
 import (
 	"encoding/base64"
+	"log"
 	"math/rand"
 
 	"github.com/gorilla/websocket"
@@ -20,10 +21,9 @@ func CreateRoom(host *websocket.Conn) {
 	roomID := generateRoomID()
 
 	room := &Room{
-		ID:         roomID,
-		Host:       host,
-		Clients:    make(map[*websocket.Conn]bool),
-		FileChunks: make([][]byte, 0),
+		ID:      roomID,
+		Host:    host,
+		Clients: make(map[*websocket.Conn]bool),
 	}
 
 	roomsMu.Lock()
@@ -62,18 +62,17 @@ func ReceiveFileChunk(host *websocket.Conn, roomID string, fileData []byte, file
 	roomsMu.Unlock()
 
 	if !ok || room.Host != host {
+		log.Printf("Invalid room ID or host connection: %s", roomID)
 		return
 	}
 
 	room.mu.Lock()
 	if isFirstChunk {
+		log.Printf("Starting file stream: %s (%s, %d bytes) in room %s", fileName, fileType, fileSize, roomID)
 		room.FileName = fileName
 		room.FileType = fileType
 		room.FileSize = fileSize
-		room.FileChunks = make([][]byte, 0)
 	}
-
-	room.FileChunks = append(room.FileChunks, fileData)
 	room.TotalChunks = totalChunks
 	room.mu.Unlock()
 
@@ -94,6 +93,14 @@ func ReceiveFileChunk(host *websocket.Conn, roomID string, fileData []byte, file
 			msg.IsFirstChunk = true
 		}
 
-		client.WriteJSON(msg)
+		if err := client.WriteJSON(msg); err != nil {
+			log.Printf("Error sending chunk to client: %v", err)
+			client.Close()
+			delete(room.Clients, client)
+		}
+	}
+
+	if isLastChunk {
+		log.Printf("Completed file stream in room %s: %s (%d/%d chunks)", roomID, fileName, chunkIndex, totalChunks)
 	}
 }
