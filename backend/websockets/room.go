@@ -1,7 +1,6 @@
 package websockets
 
 import (
-	"encoding/base64"
 	"log"
 	"math/rand"
 
@@ -53,7 +52,7 @@ func JoinRoom(client *websocket.Conn, roomID string) {
 	}
 }
 
-func ReceiveFileChunk(host *websocket.Conn, roomID string, fileData []byte, fileName, fileType string, fileSize int64, chunkIndex, totalChunks int, isLastChunk, isFirstChunk bool) {
+func ReceiveFileChunk(host *websocket.Conn, roomID string, fileData string, fileName, fileType string, fileSize int64, chunkIndex, totalChunks int, isLastChunk, isFirstChunk bool) {
 	roomsMu.RLock()
 	room, ok := rooms[roomID]
 	roomsMu.RUnlock()
@@ -73,11 +72,10 @@ func ReceiveFileChunk(host *websocket.Conn, roomID string, fileData []byte, file
 	room.TotalChunks = totalChunks
 
 	// Build message and snapshot clients under lock to avoid race
-	encoded := base64.RawURLEncoding.EncodeToString(fileData)
 	msg := Message{
 		Type:        "file_chunk",
 		RoomID:      roomID,
-		FileData:    encoded,
+		FileData:    fileData,
 		ChunkIndex:  chunkIndex,
 		TotalChunks: totalChunks,
 		IsLastChunk: isLastChunk,

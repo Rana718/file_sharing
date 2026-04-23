@@ -1,7 +1,6 @@
 package websockets
 
 import (
-	"encoding/base64"
 	"log"
 	"net/http"
 	"sync"
@@ -71,12 +70,7 @@ func HandeleWebSocket(w http.ResponseWriter, r *http.Request) {
 		case "join":
 			JoinRoom(conn, msg.RoomID)
 		case "file_chunk":
-			fileData, err := base64.RawURLEncoding.DecodeString(msg.FileData)
-			if err != nil {
-				log.Println("Error decoding file chunk:", err)
-				continue
-			}
-			ReceiveFileChunk(conn, msg.RoomID, fileData, msg.FileName, msg.FileType, msg.FileSize, msg.ChunkIndex, msg.TotalChunks, msg.IsLastChunk, msg.IsFirstChunk)
+			ReceiveFileChunk(conn, msg.RoomID, msg.FileData, msg.FileName, msg.FileType, msg.FileSize, msg.ChunkIndex, msg.TotalChunks, msg.IsLastChunk, msg.IsFirstChunk)
 		}
 	}
 }
