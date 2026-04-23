@@ -13,6 +13,13 @@ type StorageManagerWithDirectory = StorageManager & {
 
 type TransferStorageMode = "opfs" | "memory";
 
+type CurrentFileMeta = {
+  fileName: string;
+  relativePath: string;
+  fileSize: number;
+  fileType: string;
+};
+
 function ReceivedScreen() {
   const [roomID, setRoomID] = useState(["", "", "", "", "", ""]);
   const [isRoomJoined, setIsRoomJoined] = useState(false);
@@ -21,6 +28,7 @@ function ReceivedScreen() {
   const [error, setError] = useState("");
   const [receivedFile, setReceivedFile] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>("");
+  const [relativePath, setRelativePath] = useState<string>("");
   const [fileSize, setFileSize] = useState(0);
   const [connecting, setConnecting] = useState(false);
   const navigate = useNavigate();
@@ -35,6 +43,12 @@ function ReceivedScreen() {
   const [transferStatus, setTransferStatus] = useState<
     "waiting" | "receiving" | "completed" | "error"
   >("waiting");
+  const currentFileMetaRef = useRef<CurrentFileMeta>({
+    fileName: "received-file",
+    relativePath: "received-file",
+    fileSize: 0,
+    fileType: "application/octet-stream",
+  });
 
   const closeWriterIfOpen = async () => {
     if (!opfsWritableRef.current) return;
@@ -81,12 +95,11 @@ function ReceivedScreen() {
     if (transferModeRef.current === "opfs" && opfsFileHandleRef.current) {
       await closeWriterIfOpen();
       const fileFromDisk = await opfsFileHandleRef.current.getFile();
-      setReceivedFile(URL.createObjectURL(fileFromDisk));
-      return;
+      return URL.createObjectURL(fileFromDisk);
     }
 
     const completeFile = new Blob(memoryChunksRef.current, { type: mimeType });
-    setReceivedFile(URL.createObjectURL(completeFile));
+    return URL.createObjectURL(completeFile);
   };
 
   const handleIncomingChunk = async (data: any) => {
@@ -97,12 +110,19 @@ function ReceivedScreen() {
 
       setReceivedFile(null);
       setFileName(data.fileName || "received-file");
+      setRelativePath(data.relativePath || data.fileName || "received-file");
       setFileSize(data.fileSize || 0);
+      currentFileMetaRef.current = {
+        fileName: data.fileName || "received-file",
+        relativePath: data.relativePath || data.fileName || "received-file",
+        fileSize: data.fileSize || 0,
+        fileType: data.fileType || "application/octet-stream",
+      };
       setTotalChunks(data.totalChunks || 0);
       setReceivedChunks(0);
       setProgress(0);
       setTransferStatus("receiving");
-      await initTransferStorage(data.fileName || "received-file");
+      await initTransferStorage(currentFileMetaRef.current.fileName);
     }
 
     const chunkArray = base64ToUint8Array(data.fileData);
@@ -117,7 +137,13 @@ function ReceivedScreen() {
     setProgress(((data.chunkIndex + 1) / data.totalChunks) * 100);
 
     if (data.isLastChunk) {
-      await finalizeTransfer(data.fileType || "application/octet-stream");
+      const fileUrl = await finalizeTransfer(
+        currentFileMetaRef.current.fileType,
+      );
+      setReceivedFile(fileUrl);
+      setFileName(currentFileMetaRef.current.fileName);
+      setRelativePath(currentFileMetaRef.current.relativePath);
+      setFileSize(currentFileMetaRef.current.fileSize);
       setTransferStatus("completed");
     }
   };
@@ -208,12 +234,22 @@ function ReceivedScreen() {
     setError("");
     setIsRoomJoined(false);
     setRoomID(["", "", "", "", "", ""]);
+    if (receivedFile) {
+      URL.revokeObjectURL(receivedFile);
+    }
     setReceivedFile(null);
     setFileName("");
+    setRelativePath("");
     setProgress(0);
     setTotalChunks(0);
     setReceivedChunks(0);
     setTransferStatus("waiting");
+    currentFileMetaRef.current = {
+      fileName: "received-file",
+      relativePath: "received-file",
+      fileSize: 0,
+      fileType: "application/octet-stream",
+    };
     void resetTransferState();
     inputRefs.current[0]?.focus();
   };
@@ -307,6 +343,7 @@ function ReceivedScreen() {
           ) : (
             <ReceiveCard
               receivedFile={receivedFile}
+              relativePath={relativePath}
               fileName={fileName}
               fileSize={fileSize}
               progress={progress}

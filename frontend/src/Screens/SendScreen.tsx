@@ -1,11 +1,17 @@
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiRefreshCw, FiCopy } from "react-icons/fi";
-import UploadButton from "@/components/UploadButton";
+import UploadButton, { SelectedEntry } from "@/components/UploadButton";
 import { arrayBufferToBase64 } from "@/utils/encoding";
 import { FileChunkMessage } from "@/types";
 import { Lightbulb } from "lucide-react";
 import { Helmet } from "react-helmet-async";
+import JSZip from "jszip";
+
+type QueuedFile = {
+  file: File;
+  relativePath: string;
+};
 
 function SendScreen() {
   const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -17,6 +23,7 @@ function SendScreen() {
   const [copied, setCopied] = useState(false);
   const [isDisabled, setIsDisabled] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [queuedFiles, setQueuedFiles] = useState<QueuedFile[]>([]);
   const CHUNK_SIZE = 256 * 1024;
   const WS_BUFFER_HIGH_WATER_MARK = 2 * 1024 * 1024;
 
@@ -93,57 +100,141 @@ function SendScreen() {
     }
   };
 
-  const SendFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !socket || isSending) return;
+  const dedupeKey = (entry: QueuedFile) => {
+    return `${entry.relativePath}::${entry.file.size}::${entry.file.lastModified}`;
+  };
+
+  const appendFilesToQueue = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    const incoming = Array.from(files).map((file) => {
+      const fileWithPath = file as File & { webkitRelativePath?: string };
+      return {
+        file,
+        relativePath: fileWithPath.webkitRelativePath || file.name,
+      };
+    });
+
+    setQueuedFiles((prev) => {
+      const byKey = new Map(prev.map((item) => [dedupeKey(item), item]));
+      for (const item of incoming) {
+        byKey.set(dedupeKey(item), item);
+      }
+      return Array.from(byKey.values());
+    });
+  };
+
+  const streamSingleFile = async (queued: QueuedFile) => {
+    if (!socket) return;
+
+    const { file, relativePath } = queued;
+    let offset = 0;
+    let chunkIndex = 0;
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+
+    while (offset < file.size) {
+      if (socket.readyState !== WebSocket.OPEN) {
+        throw new Error("Connection closed during file transfer.");
+      }
+
+      const slice = file.slice(offset, offset + CHUNK_SIZE);
+      const chunk = await slice.arrayBuffer();
+      const base64Chunk = arrayBufferToBase64(chunk);
+      const isLastChunk = offset + chunk.byteLength >= file.size;
+
+      const message: FileChunkMessage = {
+        type: "file_chunk",
+        roomId,
+        fileData: base64Chunk,
+        chunkIndex,
+        totalChunks,
+        isLastChunk,
+      };
+
+      if (chunkIndex === 0) {
+        message.fileName = file.name;
+        message.relativePath = relativePath;
+        message.fileType = file.type || "application/octet-stream";
+        message.fileSize = file.size;
+        message.isFirstChunk = true;
+      }
+
+      await waitForSocketDrain(socket);
+      socket.send(JSON.stringify(message));
+
+      offset += chunk.byteLength;
+      chunkIndex++;
+    }
+  };
+
+  const shouldCreateArchive = (items: QueuedFile[]) => {
+    return (
+      items.length > 1 || items.some((item) => item.relativePath.includes("/"))
+    );
+  };
+
+  const sanitizeZipPath = (path: string) => {
+    return path
+      .replace(/\\+/g, "/")
+      .split("/")
+      .filter((part) => part && part !== "." && part !== "..")
+      .join("/");
+  };
+
+  const buildArchiveFile = async (items: QueuedFile[]) => {
+    const zip = new JSZip();
+
+    for (const item of items) {
+      zip.file(sanitizeZipPath(item.relativePath), item.file);
+    }
+
+    const zipBlob = await zip.generateAsync({
+      type: "blob",
+      compression: "DEFLATE",
+      compressionOptions: { level: 6 },
+    });
+
+    const now = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}${String(now.getSeconds()).padStart(2, "0")}`;
+    const zipName = `peerdrop-${stamp}.zip`;
+
+    return {
+      file: new File([zipBlob], zipName, { type: "application/zip" }),
+      relativePath: zipName,
+    } as QueuedFile;
+  };
+
+  const startTransfer = async () => {
+    if (!socket || isSending || queuedFiles.length === 0) return;
 
     setError("");
-
     setIsSending(true);
 
     try {
-      let offset = 0;
-      let chunkIndex = 0;
-      const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+      const snapshot = [...queuedFiles];
+      const payload = shouldCreateArchive(snapshot)
+        ? await buildArchiveFile(snapshot)
+        : snapshot[0];
 
-      while (offset < file.size) {
-        if (socket.readyState !== WebSocket.OPEN) {
-          throw new Error("Connection closed during file transfer.");
-        }
-
-        const slice = file.slice(offset, offset + CHUNK_SIZE);
-        const chunk = await slice.arrayBuffer();
-        const base64Chunk = arrayBufferToBase64(chunk);
-        const isLastChunk = offset + chunk.byteLength >= file.size;
-
-        const message: FileChunkMessage = {
-          type: "file_chunk",
-          roomId,
-          fileData: base64Chunk,
-          chunkIndex,
-          totalChunks,
-          isLastChunk,
-        };
-
-        if (chunkIndex === 0) {
-          message.fileName = file.name;
-          message.fileType = file.type;
-          message.fileSize = file.size;
-          message.isFirstChunk = true;
-        }
-
-        await waitForSocketDrain(socket);
-        socket.send(JSON.stringify(message));
-
-        offset += chunk.byteLength;
-        chunkIndex++;
-      }
-    } catch (err) {
-      setError("Failed to send file. Please try again.");
+      await streamSingleFile(payload);
+      setQueuedFiles([]);
+    } catch (_err) {
+      setError("Failed to prepare or send selected items. Please try again.");
     } finally {
       setIsSending(false);
     }
   };
+
+  const clearSelection = () => {
+    if (isSending) return;
+    setQueuedFiles([]);
+  };
+
+  const selectedEntries: SelectedEntry[] = queuedFiles.map((item) => ({
+    name: item.file.name,
+    size: item.file.size,
+    relativePath: item.relativePath,
+  }));
 
   const copyRoomId = async () => {
     try {
@@ -294,8 +385,13 @@ function SendScreen() {
                   className="space-y-4"
                 >
                   <UploadButton
-                    SendFile={SendFile}
-                    isDisabled={isDisabled || isSending}
+                    onSelectFiles={appendFilesToQueue}
+                    onSelectFolder={appendFilesToQueue}
+                    onStartTransfer={startTransfer}
+                    onClearSelection={clearSelection}
+                    selectedEntries={selectedEntries}
+                    isDisabled={isDisabled}
+                    isSending={isSending}
                   />
                   <motion.p
                     initial={{ opacity: 0 }}
@@ -310,7 +406,7 @@ function SendScreen() {
                   </motion.p>
                   {isSending && (
                     <p className="text-sm text-[#FFD700]">
-                      Sending file in RAM-safe streaming mode...
+                      Streaming selected items in RAM-safe mode...
                     </p>
                   )}
                 </motion.div>
@@ -327,7 +423,8 @@ function SendScreen() {
                 <p className="text-left leading-relaxed">
                   <span className="text-[#FFD700] font-medium">Note:</span>{" "}
                   Peer-to-peer transfer! Data isn't stored on the backend.
-                  Ensure the receiver joins the room before sharing the file.
+                  Select files/folder first, then press Send. Multiple files or
+                  folders are auto-zipped before transfer.
                 </p>
               </motion.div>
             </motion.div>

@@ -24,6 +24,7 @@ type Message struct {
 	RoomID       string `json:"roomId,omitempty"`
 	FileData     string `json:"fileData,omitempty"`
 	FileName     string `json:"fileName,omitempty"`
+	RelativePath string `json:"relativePath,omitempty"`
 	FileType     string `json:"fileType,omitempty"`
 	FileSize     int64  `json:"fileSize,omitempty"`
 	ChunkIndex   int    `json:"chunkIndex,omitempty"`
@@ -70,7 +71,7 @@ func HandeleWebSocket(w http.ResponseWriter, r *http.Request) {
 		case "join":
 			JoinRoom(conn, msg.RoomID)
 		case "file_chunk":
-			ReceiveFileChunk(conn, msg.RoomID, msg.FileData, msg.FileName, msg.FileType, msg.FileSize, msg.ChunkIndex, msg.TotalChunks, msg.IsLastChunk, msg.IsFirstChunk)
+			ReceiveFileChunk(conn, msg.RoomID, msg.FileData, msg.FileName, msg.RelativePath, msg.FileType, msg.FileSize, msg.ChunkIndex, msg.TotalChunks, msg.IsLastChunk, msg.IsFirstChunk)
 		}
 	}
 }
