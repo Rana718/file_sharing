@@ -10,6 +10,5 @@ export interface FileChunkMessage {
   fileSize?: number;
   isFirstChunk?: boolean;
   relativePath?: string;
-  fileIndex?: number;
-  totalFiles?: number;
+  isEncrypted?: boolean;
 }

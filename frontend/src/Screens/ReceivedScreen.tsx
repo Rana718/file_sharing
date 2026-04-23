@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { FiRefreshCw, FiArrowLeft } from "react-icons/fi";
 import { base64ToUint8Array } from "@/utils/encoding";
 import InputBox from "@/components/receive/InputBox";
 import ReceiveCard from "@/components/receive/ReceiveCard";
 import { Helmet } from "react-helmet-async";
+import {
+  decryptChunk,
+  generateEncryptionKeyHex,
+  isValidEncryptionKeyHex,
+} from "@/utils/crypto";
 
 type StorageManagerWithDirectory = StorageManager & {
   getDirectory?: () => Promise<FileSystemDirectoryHandle>;
@@ -18,9 +23,11 @@ type CurrentFileMeta = {
   relativePath: string;
   fileSize: number;
   fileType: string;
+  isEncrypted: boolean;
 };
 
 function ReceivedScreen() {
+  const location = useLocation();
   const [roomID, setRoomID] = useState(["", "", "", "", "", ""]);
   const [isRoomJoined, setIsRoomJoined] = useState(false);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
@@ -40,14 +47,22 @@ function ReceivedScreen() {
   const [progress, setProgress] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
   const [receivedChunks, setReceivedChunks] = useState(0);
+  const [isEncryptedTransfer, setIsEncryptedTransfer] = useState(false);
   const [transferStatus, setTransferStatus] = useState<
     "waiting" | "receiving" | "completed" | "error"
   >("waiting");
+  const autoJoinAttemptedRef = useRef(false);
+
+  const searchParams = new URLSearchParams(location.search);
+  const roomFromUrl = searchParams.get("room") || "";
+  const secureKey = location.hash.replace(/^#/, "").trim().toLowerCase();
+  const hasValidSecureKey = isValidEncryptionKeyHex(secureKey);
   const currentFileMetaRef = useRef<CurrentFileMeta>({
     fileName: "received-file",
     relativePath: "received-file",
     fileSize: 0,
     fileType: "application/octet-stream",
+    isEncrypted: false,
   });
 
   const closeWriterIfOpen = async () => {
@@ -65,11 +80,18 @@ function ReceivedScreen() {
     return name.replace(/[\\/:*?"<>|]/g, "_");
   };
 
-  const initTransferStorage = async (incomingFileName: string) => {
+  const initTransferStorage = async (
+    incomingFileName: string,
+    allowDiskStorage: boolean,
+  ) => {
     transferModeRef.current = "memory";
     memoryChunksRef.current = [];
     opfsFileHandleRef.current = null;
     await closeWriterIfOpen();
+
+    if (!allowDiskStorage) {
+      return;
+    }
 
     const storageManager = navigator.storage as StorageManagerWithDirectory;
     if (!storageManager.getDirectory) return;
@@ -117,15 +139,23 @@ function ReceivedScreen() {
         relativePath: data.relativePath || data.fileName || "received-file",
         fileSize: data.fileSize || 0,
         fileType: data.fileType || "application/octet-stream",
+        isEncrypted: !!data.isEncrypted,
       };
       setTotalChunks(data.totalChunks || 0);
       setReceivedChunks(0);
       setProgress(0);
+      setIsEncryptedTransfer(currentFileMetaRef.current.isEncrypted);
       setTransferStatus("receiving");
-      await initTransferStorage(currentFileMetaRef.current.fileName);
+      await initTransferStorage(
+        currentFileMetaRef.current.fileName,
+        !currentFileMetaRef.current.isEncrypted,
+      );
     }
 
-    const chunkArray = base64ToUint8Array(data.fileData);
+    const encryptedChunk = base64ToUint8Array(data.fileData);
+    const chunkArray = currentFileMetaRef.current.isEncrypted
+      ? await decryptChunk(encryptedChunk, secureKey)
+      : encryptedChunk;
 
     if (transferModeRef.current === "opfs" && opfsWritableRef.current) {
       await opfsWritableRef.current.write(chunkArray);
@@ -156,6 +186,19 @@ function ReceivedScreen() {
   };
 
   useEffect(() => {
+    if (autoJoinAttemptedRef.current) return;
+    if (!/^\d{6}$/.test(roomFromUrl)) return;
+
+    autoJoinAttemptedRef.current = true;
+    const digits = roomFromUrl.split("").slice(0, 6);
+    setRoomID(digits);
+    setConnecting(true);
+    setError("");
+    setIsRoomJoined(true);
+    void joinRoom(roomFromUrl);
+  }, [roomFromUrl]);
+
+  useEffect(() => {
     if (socket) {
       socket.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -171,6 +214,9 @@ function ReceivedScreen() {
             }
 
             if (data.type === "file_chunk") {
+              if (data.isEncrypted && !hasValidSecureKey) {
+                throw new Error("Missing decryption key in URL fragment");
+              }
               await handleIncomingChunk(data);
               return;
             }
@@ -243,12 +289,14 @@ function ReceivedScreen() {
     setProgress(0);
     setTotalChunks(0);
     setReceivedChunks(0);
+    setIsEncryptedTransfer(false);
     setTransferStatus("waiting");
     currentFileMetaRef.current = {
       fileName: "received-file",
       relativePath: "received-file",
       fileSize: 0,
       fileType: "application/octet-stream",
+      isEncrypted: false,
     };
     void resetTransferState();
     inputRefs.current[0]?.focus();
@@ -271,6 +319,14 @@ function ReceivedScreen() {
     } catch (error) {
       console.error("Failed to join room:", error);
     }
+  };
+
+  const startUltraSecureRoom = () => {
+    const newKey = generateEncryptionKeyHex();
+    if (socket) {
+      socket.close();
+    }
+    navigate(`/send?secure=1#${newKey}`);
   };
 
   return (
@@ -333,13 +389,27 @@ function ReceivedScreen() {
           )}
 
           {!isRoomJoined || error ? (
-            <InputBox
-              roomID={roomID}
-              connecting={connecting}
-              handleJoinRoom={handleJoinRoom}
-              setRoomID={setRoomID}
-              inputRefs={inputRefs}
-            />
+            <div className="space-y-4">
+              <InputBox
+                roomID={roomID}
+                connecting={connecting}
+                handleJoinRoom={handleJoinRoom}
+                setRoomID={setRoomID}
+                inputRefs={inputRefs}
+              />
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={startUltraSecureRoom}
+                className="w-full bg-gradient-to-r from-[#1A7F64] to-[#1F9D7A] text-white px-6 py-3 rounded-lg font-semibold"
+              >
+                Ultra Security: Create New Secure Room
+              </motion.button>
+              <p className="text-xs text-center text-[#D9D9D9]/70">
+                Creates a new room with end-to-end encryption key in URL
+                fragment.
+              </p>
+            </div>
           ) : (
             <ReceiveCard
               receivedFile={receivedFile}
@@ -349,6 +419,7 @@ function ReceivedScreen() {
               progress={progress}
               totalChunks={totalChunks}
               receivedChunks={receivedChunks}
+              isEncrypted={isEncryptedTransfer}
               transferStatus={transferStatus}
               isRoomJoined={isRoomJoined}
               error={error}

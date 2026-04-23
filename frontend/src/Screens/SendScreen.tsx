@@ -7,6 +7,12 @@ import { FileChunkMessage } from "@/types";
 import { Lightbulb } from "lucide-react";
 import { Helmet } from "react-helmet-async";
 import JSZip from "jszip";
+import {
+  encryptChunk,
+  generateEncryptionKeyHex,
+  isValidEncryptionKeyHex,
+} from "@/utils/crypto";
+import { useLocation, useNavigate } from "react-router-dom";
 
 type QueuedFile = {
   file: File;
@@ -14,6 +20,8 @@ type QueuedFile = {
 };
 
 function SendScreen() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [socket, setSocket] = useState<WebSocket | null>(null);
   const [roomId, setRoomId] = useState("");
   const [isHost, setIsHost] = useState(false);
@@ -21,11 +29,36 @@ function SendScreen() {
   const [error, setError] = useState<string>("");
   const [participantsCount, setParticipantsCount] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [secureLinkCopied, setSecureLinkCopied] = useState(false);
   const [isDisabled, setIsDisabled] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [queuedFiles, setQueuedFiles] = useState<QueuedFile[]>([]);
   const CHUNK_SIZE = 256 * 1024;
   const WS_BUFFER_HIGH_WATER_MARK = 2 * 1024 * 1024;
+
+  const searchParams = new URLSearchParams(location.search);
+  const secureIntent = searchParams.get("secure") === "1";
+  const hashKey = location.hash.replace(/^#/, "").trim().toLowerCase();
+  const secureKey = isValidEncryptionKeyHex(hashKey)
+    ? hashKey
+    : secureIntent
+      ? generateEncryptionKeyHex()
+      : "";
+  const isSecureMode = secureIntent || !!secureKey;
+  const secureReceiveUrl =
+    roomId && secureKey
+      ? `${window.location.origin}/receive?room=${roomId}#${secureKey}`
+      : "";
+
+  useEffect(() => {
+    if (isSecureMode && !hashKey && secureKey) {
+      window.history.replaceState(
+        null,
+        "",
+        `${location.pathname}${location.search}#${secureKey}`,
+      );
+    }
+  }, [isSecureMode, hashKey, secureKey, location.pathname, location.search]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -139,7 +172,15 @@ function SendScreen() {
 
       const slice = file.slice(offset, offset + CHUNK_SIZE);
       const chunk = await slice.arrayBuffer();
-      const base64Chunk = arrayBufferToBase64(chunk);
+      const plainChunk = new Uint8Array(chunk);
+      const payloadBytes = isSecureMode
+        ? await encryptChunk(plainChunk, secureKey)
+        : plainChunk;
+      const payloadBuffer = payloadBytes.buffer.slice(
+        payloadBytes.byteOffset,
+        payloadBytes.byteOffset + payloadBytes.byteLength,
+      ) as ArrayBuffer;
+      const base64Chunk = arrayBufferToBase64(payloadBuffer);
       const isLastChunk = offset + chunk.byteLength >= file.size;
 
       const message: FileChunkMessage = {
@@ -148,6 +189,7 @@ function SendScreen() {
         fileData: base64Chunk,
         chunkIndex,
         totalChunks,
+        isEncrypted: isSecureMode,
         isLastChunk,
       };
 
@@ -246,6 +288,36 @@ function SendScreen() {
     }
   };
 
+  const copySecureReceiveLink = async () => {
+    if (!roomId || !secureKey) return;
+
+    try {
+      await navigator.clipboard.writeText(secureReceiveUrl);
+      setSecureLinkCopied(true);
+      setTimeout(() => setSecureLinkCopied(false), 2000);
+    } catch (_err) {
+      setError("Failed to copy secure link");
+    }
+  };
+
+  const toggleServerMode = (enabled: boolean) => {
+    const room = roomId ? `&room=${roomId}` : "";
+
+    if (enabled) {
+      const key = hasValidEncryptionKeyInUrl(hashKey)
+        ? hashKey
+        : generateEncryptionKeyHex();
+      navigate(`/send?secure=1${room}#${key}`, { replace: true });
+      return;
+    }
+
+    navigate(`/send${room ? `?${room.slice(1)}` : ""}`, { replace: true });
+  };
+
+  const hasValidEncryptionKeyInUrl = (value: string) => {
+    return isValidEncryptionKeyHex(value);
+  };
+
   return (
     <>
       <Helmet>
@@ -339,41 +411,88 @@ function SendScreen() {
                             transition-all duration-300"
             >
               <div className="space-y-3">
-                <motion.p
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                  className="text-xl font-medium"
-                >
-                  Room ID:
-                </motion.p>
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 }}
-                  className="flex items-center justify-center gap-3"
-                >
-                  <code className="bg-[#0E0E0E]/80 px-6 py-3 rounded-lg font-mono text-[#FFD700] text-lg shadow-inner">
-                    {roomId}
-                  </code>
-                  <motion.button
-                    whileHover={{ scale: 1.1, rotate: 15 }}
-                    whileTap={{ scale: 0.9 }}
-                    onClick={copyRoomId}
-                    className="text-[#FFD700] hover:text-[#FFA500] p-2 transition-colors duration-300"
+                <div className="flex items-center justify-between bg-[#0E0E0E]/50 rounded-lg px-4 py-3 border border-[#FFD700]/20">
+                  <div className="text-left">
+                    <p className="text-sm font-semibold text-[#FFD700]">
+                      Server Mode
+                    </p>
+                    <p className="text-xs text-[#D9D9D9]/70">
+                      Enable end-to-end encrypted transfer link
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => toggleServerMode(!isSecureMode)}
+                    className={`px-3 py-1 rounded-md text-sm font-semibold ${isSecureMode ? "bg-[#1A7F64] text-white" : "bg-[#2A2A2A] text-[#D9D9D9]"}`}
                   >
-                    <FiCopy className="w-6 h-6" />
-                  </motion.button>
-                </motion.div>
-                {copied && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="text-sm text-[#FFD700]"
-                  >
-                    Copied to clipboard!
-                  </motion.p>
+                    {isSecureMode ? "On" : "Off"}
+                  </button>
+                </div>
+
+                {!isSecureMode && (
+                  <>
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.2 }}
+                      className="text-xl font-medium"
+                    >
+                      Room ID:
+                    </motion.p>
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.3 }}
+                      className="flex items-center justify-center gap-3"
+                    >
+                      <code className="bg-[#0E0E0E]/80 px-6 py-3 rounded-lg font-mono text-[#FFD700] text-lg shadow-inner">
+                        {roomId}
+                      </code>
+                      <motion.button
+                        whileHover={{ scale: 1.1, rotate: 15 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={copyRoomId}
+                        className="text-[#FFD700] hover:text-[#FFA500] p-2 transition-colors duration-300"
+                      >
+                        <FiCopy className="w-6 h-6" />
+                      </motion.button>
+                    </motion.div>
+                    {copied && (
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="text-sm text-[#FFD700]"
+                      >
+                        Copied to clipboard!
+                      </motion.p>
+                    )}
+                  </>
+                )}
+                {isSecureMode && (
+                  <div className="mt-3 space-y-2">
+                    <p className="text-sm text-[#FFD700] font-medium">
+                      Ultra Secure Link (Room ID hidden in secure mode)
+                    </p>
+                    <p className="text-xs text-[#D9D9D9]/70 break-all text-left bg-[#0E0E0E]/50 p-2 rounded border border-[#FFD700]/20">
+                      {secureReceiveUrl ||
+                        "Receiver URL will appear after room is created."}
+                    </p>
+                    <button
+                      onClick={copySecureReceiveLink}
+                      disabled={!secureReceiveUrl}
+                      className="px-4 py-2 rounded-lg border border-[#FFD700]/40 text-sm hover:border-[#FFD700]/70"
+                    >
+                      Copy Ultra Secure Receive Link
+                    </button>
+                    <p className="text-xs text-[#D9D9D9]/70 break-all">
+                      Receiver link contains decryption key in URL fragment.
+                    </p>
+                    {secureLinkCopied && (
+                      <p className="text-xs text-[#FFD700]">
+                        Secure link copied.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -425,6 +544,9 @@ function SendScreen() {
                   Peer-to-peer transfer! Data isn't stored on the backend.
                   Select files/folder first, then press Send. Multiple files or
                   folders are auto-zipped before transfer.
+                  {isSecureMode
+                    ? " Ultra Secure mode is active: chunks are end-to-end encrypted in browser."
+                    : ""}
                 </p>
               </motion.div>
             </motion.div>

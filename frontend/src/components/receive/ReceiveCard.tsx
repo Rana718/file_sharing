@@ -11,6 +11,7 @@ interface ReceiveCardProps {
   progress: number;
   receivedChunks: number;
   totalChunks: number;
+  isEncrypted: boolean;
   receivedFile: string | null;
   isRoomJoined: boolean;
   error: string;
@@ -25,6 +26,7 @@ function ReceiveCard({
   progress,
   receivedChunks,
   totalChunks,
+  isEncrypted,
   receivedFile,
   isRoomJoined,
   error,
@@ -41,8 +43,19 @@ function ReceiveCard({
           animate={{ opacity: 1 }}
           className="mb-6 bg-[#FFD700]/10 p-4 rounded-lg backdrop-blur-md"
         >
-          <p className="text-[#FFD700]">Room ID: {roomID.join("")}</p>
-          <p className="text-sm text-[#D9D9D9]/60">Connected</p>
+          {isEncrypted ? (
+            <>
+              <p className="text-[#FFD700]">Secure Link Mode</p>
+              <p className="text-sm text-[#D9D9D9]/60">
+                Connected • End-to-end encrypted
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="text-[#FFD700]">Room ID: {roomID.join("")}</p>
+              <p className="text-sm text-[#D9D9D9]/60">Connected</p>
+            </>
+          )}
         </motion.div>
       )}
 

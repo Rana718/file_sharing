@@ -52,7 +52,7 @@ func JoinRoom(client *websocket.Conn, roomID string) {
 	}
 }
 
-func ReceiveFileChunk(host *websocket.Conn, roomID string, fileData string, fileName, relativePath, fileType string, fileSize int64, chunkIndex, totalChunks int, isLastChunk, isFirstChunk bool) {
+func ReceiveFileChunk(host *websocket.Conn, roomID string, fileData string, fileName, relativePath, fileType string, fileSize int64, chunkIndex, totalChunks int, isEncrypted, isLastChunk, isFirstChunk bool) {
 	roomsMu.RLock()
 	room, ok := rooms[roomID]
 	roomsMu.RUnlock()
@@ -78,6 +78,7 @@ func ReceiveFileChunk(host *websocket.Conn, roomID string, fileData string, file
 		FileData:    fileData,
 		ChunkIndex:  chunkIndex,
 		TotalChunks: totalChunks,
+		IsEncrypted: isEncrypted,
 		IsLastChunk: isLastChunk,
 	}
 	if isFirstChunk {
