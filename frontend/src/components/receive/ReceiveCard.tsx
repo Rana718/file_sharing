@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 import { FiDownload, FiFile } from "react-icons/fi";
 import ProgressBar from "./ProgressBar";
-import { formatFileSize } from "@/utils";
+import { formatEta, formatFileSize, formatTransferSpeed } from "@/utils";
 
 interface ReceiveCardProps {
   transferStatus: "waiting" | "receiving" | "completed" | "error";
@@ -9,8 +9,11 @@ interface ReceiveCardProps {
   relativePath: string;
   fileSize: number;
   progress: number;
+  receivedBytes: number;
   receivedChunks: number;
   totalChunks: number;
+  speedBytesPerSec: number;
+  etaSeconds: number | null;
   isEncrypted: boolean;
   receivedFile: string | null;
   isRoomJoined: boolean;
@@ -24,8 +27,11 @@ function ReceiveCard({
   relativePath,
   fileSize,
   progress,
+  receivedBytes,
   receivedChunks,
   totalChunks,
+  speedBytesPerSec,
+  etaSeconds,
   isEncrypted,
   receivedFile,
   isRoomJoined,
@@ -108,6 +114,13 @@ function ReceiveCard({
             </p>
           )}
           <ProgressBar progress={progress} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm text-[#D9D9D9]/70">
+            <p>
+              Data: {formatFileSize(receivedBytes)} / {formatFileSize(fileSize)}
+            </p>
+            <p>Speed: {formatTransferSpeed(speedBytesPerSec)}</p>
+            <p className="sm:col-span-2">ETA: {formatEta(etaSeconds)}</p>
+          </div>
           <p className="text-sm text-center text-[#D9D9D9]/60">
             Received {receivedChunks} of {totalChunks} chunks
           </p>

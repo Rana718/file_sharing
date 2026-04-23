@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { FiRefreshCw, FiArrowLeft } from "react-icons/fi";
@@ -11,6 +11,7 @@ import {
   generateEncryptionKeyHex,
   isValidEncryptionKeyHex,
 } from "@/utils/crypto";
+import { getWebSocketServerUrl } from "@/utils/websocket";
 
 type StorageManagerWithDirectory = StorageManager & {
   getDirectory?: () => Promise<FileSystemDirectoryHandle>;
@@ -39,7 +40,7 @@ function ReceivedScreen() {
   const [fileSize, setFileSize] = useState(0);
   const [connecting, setConnecting] = useState(false);
   const navigate = useNavigate();
-  const memoryChunksRef = useRef<Uint8Array[]>([]);
+  const memoryChunksRef = useRef<ArrayBuffer[]>([]);
   const opfsWritableRef = useRef<FileSystemWritableFileStream | null>(null);
   const opfsFileHandleRef = useRef<FileSystemFileHandle | null>(null);
   const transferModeRef = useRef<TransferStorageMode>("memory");
@@ -47,11 +48,35 @@ function ReceivedScreen() {
   const [progress, setProgress] = useState(0);
   const [totalChunks, setTotalChunks] = useState(0);
   const [receivedChunks, setReceivedChunks] = useState(0);
+  const [receivedBytes, setReceivedBytes] = useState(0);
+  const [transferStartedAt, setTransferStartedAt] = useState<number | null>(
+    null,
+  );
   const [isEncryptedTransfer, setIsEncryptedTransfer] = useState(false);
   const [transferStatus, setTransferStatus] = useState<
     "waiting" | "receiving" | "completed" | "error"
   >("waiting");
   const autoJoinAttemptedRef = useRef(false);
+
+  const receiverSpeedBps = useMemo(() => {
+    if (!transferStartedAt || receivedBytes <= 0) return 0;
+    const elapsedSeconds = (Date.now() - transferStartedAt) / 1000;
+    if (elapsedSeconds <= 0) return 0;
+    return receivedBytes / elapsedSeconds;
+  }, [receivedBytes, transferStartedAt]);
+
+  const receiverEtaSeconds = useMemo(() => {
+    if (
+      transferStatus !== "receiving" ||
+      fileSize <= 0 ||
+      receiverSpeedBps <= 0 ||
+      receivedBytes >= fileSize
+    ) {
+      return null;
+    }
+
+    return (fileSize - receivedBytes) / receiverSpeedBps;
+  }, [transferStatus, fileSize, receiverSpeedBps, receivedBytes]);
 
   const searchParams = new URLSearchParams(location.search);
   const roomFromUrl = searchParams.get("room") || "";
@@ -78,6 +103,12 @@ function ReceivedScreen() {
 
   const sanitizeFileName = (name: string) => {
     return name.replace(/[\\/:*?"<>|]/g, "_");
+  };
+
+  const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
+    const copy = new Uint8Array(bytes.byteLength);
+    copy.set(bytes);
+    return copy.buffer;
   };
 
   const initTransferStorage = async (
@@ -143,6 +174,8 @@ function ReceivedScreen() {
       };
       setTotalChunks(data.totalChunks || 0);
       setReceivedChunks(0);
+      setReceivedBytes(0);
+      setTransferStartedAt(Date.now());
       setProgress(0);
       setIsEncryptedTransfer(currentFileMetaRef.current.isEncrypted);
       setTransferStatus("receiving");
@@ -156,13 +189,15 @@ function ReceivedScreen() {
     const chunkArray = currentFileMetaRef.current.isEncrypted
       ? await decryptChunk(encryptedChunk, secureKey)
       : encryptedChunk;
+    const chunkBuffer = toArrayBuffer(chunkArray);
 
     if (transferModeRef.current === "opfs" && opfsWritableRef.current) {
-      await opfsWritableRef.current.write(chunkArray);
+      await opfsWritableRef.current.write(chunkBuffer);
     } else {
-      memoryChunksRef.current.push(chunkArray);
+      memoryChunksRef.current.push(chunkBuffer);
     }
 
+    setReceivedBytes((prev) => prev + chunkArray.byteLength);
     setReceivedChunks((prev) => prev + 1);
     setProgress(((data.chunkIndex + 1) / data.totalChunks) * 100);
 
@@ -252,7 +287,16 @@ function ReceivedScreen() {
 
   const ConnectWebSocket = () => {
     return new Promise<WebSocket>((resolve, reject) => {
-      const ws = new WebSocket(import.meta.env.VITE_SERVER_URL);
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(getWebSocketServerUrl());
+      } catch (connectionError) {
+        handleError(
+          "WebSocket URL is not configured correctly. Check VITE_SERVER_URL.",
+        );
+        reject(connectionError);
+        return;
+      }
 
       ws.onopen = () => {
         setError("");
@@ -289,6 +333,8 @@ function ReceivedScreen() {
     setProgress(0);
     setTotalChunks(0);
     setReceivedChunks(0);
+    setReceivedBytes(0);
+    setTransferStartedAt(null);
     setIsEncryptedTransfer(false);
     setTransferStatus("waiting");
     currentFileMetaRef.current = {
@@ -403,12 +449,8 @@ function ReceivedScreen() {
                 onClick={startUltraSecureRoom}
                 className="w-full bg-gradient-to-r from-[#1A7F64] to-[#1F9D7A] text-white px-6 py-3 rounded-lg font-semibold"
               >
-                Ultra Security: Create New Secure Room
+                Create New Secure Room
               </motion.button>
-              <p className="text-xs text-center text-[#D9D9D9]/70">
-                Creates a new room with end-to-end encryption key in URL
-                fragment.
-              </p>
             </div>
           ) : (
             <ReceiveCard
@@ -419,6 +461,9 @@ function ReceivedScreen() {
               progress={progress}
               totalChunks={totalChunks}
               receivedChunks={receivedChunks}
+              receivedBytes={receivedBytes}
+              speedBytesPerSec={receiverSpeedBps}
+              etaSeconds={receiverEtaSeconds}
               isEncrypted={isEncryptedTransfer}
               transferStatus={transferStatus}
               isRoomJoined={isRoomJoined}

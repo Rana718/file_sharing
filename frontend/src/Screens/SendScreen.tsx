@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { FiRefreshCw, FiCopy } from "react-icons/fi";
 import UploadButton, { SelectedEntry } from "@/components/UploadButton";
@@ -12,6 +12,8 @@ import {
   generateEncryptionKeyHex,
   isValidEncryptionKeyHex,
 } from "@/utils/crypto";
+import { getWebSocketServerUrl } from "@/utils/websocket";
+import { formatEta, formatFileSize, formatTransferSpeed } from "@/utils";
 import { useLocation, useNavigate } from "react-router-dom";
 
 type QueuedFile = {
@@ -33,8 +35,33 @@ function SendScreen() {
   const [isDisabled, setIsDisabled] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [queuedFiles, setQueuedFiles] = useState<QueuedFile[]>([]);
+  const [transferTotalBytes, setTransferTotalBytes] = useState(0);
+  const [transferSentBytes, setTransferSentBytes] = useState(0);
+  const [transferStartedAt, setTransferStartedAt] = useState<number | null>(
+    null,
+  );
   const CHUNK_SIZE = 256 * 1024;
   const WS_BUFFER_HIGH_WATER_MARK = 2 * 1024 * 1024;
+
+  const senderSpeedBps = useMemo(() => {
+    if (!transferStartedAt || transferSentBytes <= 0) return 0;
+    const elapsedSeconds = (Date.now() - transferStartedAt) / 1000;
+    if (elapsedSeconds <= 0) return 0;
+    return transferSentBytes / elapsedSeconds;
+  }, [transferSentBytes, transferStartedAt]);
+
+  const senderEtaSeconds = useMemo(() => {
+    if (
+      !isSending ||
+      transferTotalBytes <= 0 ||
+      senderSpeedBps <= 0 ||
+      transferSentBytes >= transferTotalBytes
+    ) {
+      return null;
+    }
+
+    return (transferTotalBytes - transferSentBytes) / senderSpeedBps;
+  }, [isSending, transferTotalBytes, transferSentBytes, senderSpeedBps]);
 
   const searchParams = new URLSearchParams(location.search);
   const secureIntent = searchParams.get("secure") === "1";
@@ -96,7 +123,17 @@ function SendScreen() {
 
   const ConnectWebSocket = () => {
     return new Promise<WebSocket>((resolve, reject) => {
-      const ws = new WebSocket(import.meta.env.VITE_SERVER_URL);
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(getWebSocketServerUrl());
+      } catch (connectionError) {
+        handleError(
+          "WebSocket URL is not configured correctly. Check VITE_SERVER_URL.",
+        );
+        reject(connectionError);
+        return;
+      }
+
       ws.onopen = () => {
         setError("");
         console.log("Connected to WebSocket");
@@ -206,6 +243,7 @@ function SendScreen() {
 
       offset += chunk.byteLength;
       chunkIndex++;
+      setTransferSentBytes((prev) => prev + chunk.byteLength);
     }
   };
 
@@ -251,12 +289,17 @@ function SendScreen() {
 
     setError("");
     setIsSending(true);
+    setTransferSentBytes(0);
+    setTransferTotalBytes(0);
+    setTransferStartedAt(Date.now());
 
     try {
       const snapshot = [...queuedFiles];
       const payload = shouldCreateArchive(snapshot)
         ? await buildArchiveFile(snapshot)
         : snapshot[0];
+
+      setTransferTotalBytes(payload.file.size);
 
       await streamSingleFile(payload);
       setQueuedFiles([]);
@@ -414,9 +457,6 @@ function SendScreen() {
                 <div className="flex items-center justify-between bg-[#0E0E0E]/50 rounded-lg px-4 py-3 border border-[#FFD700]/20">
                   <div className="text-left">
                     <p className="text-sm font-semibold text-[#FFD700]">
-                      Server Mode
-                    </p>
-                    <p className="text-xs text-[#D9D9D9]/70">
                       Enable end-to-end encrypted transfer link
                     </p>
                   </div>
@@ -471,7 +511,7 @@ function SendScreen() {
                 {isSecureMode && (
                   <div className="mt-3 space-y-2">
                     <p className="text-sm text-[#FFD700] font-medium">
-                      Ultra Secure Link (Room ID hidden in secure mode)
+                      Secure Link
                     </p>
                     <p className="text-xs text-[#D9D9D9]/70 break-all text-left bg-[#0E0E0E]/50 p-2 rounded border border-[#FFD700]/20">
                       {secureReceiveUrl ||
@@ -482,11 +522,8 @@ function SendScreen() {
                       disabled={!secureReceiveUrl}
                       className="px-4 py-2 rounded-lg border border-[#FFD700]/40 text-sm hover:border-[#FFD700]/70"
                     >
-                      Copy Ultra Secure Receive Link
+                      Copy
                     </button>
-                    <p className="text-xs text-[#D9D9D9]/70 break-all">
-                      Receiver link contains decryption key in URL fragment.
-                    </p>
                     {secureLinkCopied && (
                       <p className="text-xs text-[#FFD700]">
                         Secure link copied.
@@ -524,9 +561,17 @@ function SendScreen() {
                     </span>
                   </motion.p>
                   {isSending && (
-                    <p className="text-sm text-[#FFD700]">
-                      Streaming selected items in RAM-safe mode...
-                    </p>
+                    <div className="text-sm text-[#FFD700] space-y-1">
+                      <p>Streaming selected items in RAM-safe mode...</p>
+                      <p className="text-[#D9D9D9]/80">
+                        Sent {formatFileSize(transferSentBytes)} /{" "}
+                        {formatFileSize(transferTotalBytes)}
+                      </p>
+                      <p className="text-[#D9D9D9]/80">
+                        Speed: {formatTransferSpeed(senderSpeedBps)} • ETA:{" "}
+                        {formatEta(senderEtaSeconds)}
+                      </p>
+                    </div>
                   )}
                 </motion.div>
               )}
