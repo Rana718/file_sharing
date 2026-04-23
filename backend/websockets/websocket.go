@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"log"
 	"net/http"
-	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
@@ -16,7 +15,7 @@ type Room struct {
 	Clients     map[*websocket.Conn]bool
 	FileName    string
 	FileType    string
-	FileSize    int
+	FileSize    int64 // int64 to support files > 2GB
 	TotalChunks int
 	mu          sync.Mutex
 }
@@ -27,7 +26,7 @@ type Message struct {
 	FileData     string `json:"fileData,omitempty"`
 	FileName     string `json:"fileName,omitempty"`
 	FileType     string `json:"fileType,omitempty"`
-	FileSize     int    `json:"fileSize,omitempty"`
+	FileSize     int64  `json:"fileSize,omitempty"`
 	ChunkIndex   int    `json:"chunkIndex,omitempty"`
 	TotalChunks  int    `json:"totalChunks,omitempty"`
 	IsLastChunk  bool   `json:"isLastChunk,omitempty"`
@@ -36,60 +35,47 @@ type Message struct {
 }
 
 var (
-	rooms    = make(map[string]*Room)
-	roomsMu  sync.Mutex
+	rooms   = make(map[string]*Room)
+	roomsMu sync.RWMutex
 	upgrader = websocket.Upgrader{
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
+		ReadBufferSize:  1024 * 64,
+		WriteBufferSize: 1024 * 64,
+		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
-	ChunkSize = 1024 * 64
 )
 
 func HandeleWebSocket(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
-
 	if err != nil {
-		handleDisconnect(conn)
+		log.Println("Upgrade error:", err)
 		return
 	}
-	defer conn.Close()
+	defer func() {
+		handleDisconnect(conn)
+		conn.Close()
+	}()
 
-	conn.SetReadLimit(1024 * 1024) 
+	// No read limit — supports unlimited file size via chunking
+	conn.SetReadLimit(-1)
 
 	for {
 		var msg Message
-		err := conn.ReadJSON(&msg)
-
-		if err != nil {
-			handleDisconnect(conn)
-			log.Println(err)
+		if err := conn.ReadJSON(&msg); err != nil {
+			log.Println("Read error:", err)
 			break
 		}
 
 		switch msg.Type {
 		case "create":
 			CreateRoom(conn)
-
 		case "join":
 			JoinRoom(conn, msg.RoomID)
-
 		case "file_chunk":
-			fileDataStr := msg.FileData
-			fileDataStr = strings.ReplaceAll(fileDataStr, "-", "+")
-			fileDataStr = strings.ReplaceAll(fileDataStr, "_", "/")
-
-			if padding := len(fileDataStr) % 4; padding != 0 {
-				fileDataStr += strings.Repeat("=", 4-padding)
-			}
-
-			fileData, err := base64.StdEncoding.DecodeString(fileDataStr)
-
+			fileData, err := base64.RawURLEncoding.DecodeString(msg.FileData)
 			if err != nil {
 				log.Println("Error decoding file chunk:", err)
 				continue
 			}
-
 			ReceiveFileChunk(conn, msg.RoomID, fileData, msg.FileName, msg.FileType, msg.FileSize, msg.ChunkIndex, msg.TotalChunks, msg.IsLastChunk, msg.IsFirstChunk)
 		}
 	}
@@ -97,40 +83,49 @@ func HandeleWebSocket(w http.ResponseWriter, r *http.Request) {
 
 func handleDisconnect(conn *websocket.Conn) {
 	roomsMu.Lock()
-	defer roomsMu.Unlock()
 
 	for roomID, room := range rooms {
 		room.mu.Lock()
 
 		if room.Host == conn {
-			log.Printf("Host disconnected from room %s, closing room", roomID)
+			log.Printf("Host disconnected from room %s", roomID)
 			for client := range room.Clients {
 				client.WriteJSON(Message{Type: "room_closed"})
 				client.Close()
 			}
-
 			room.Clients = nil
 			delete(rooms, roomID)
 			room.mu.Unlock()
+			roomsMu.Unlock()
 			return
 		}
 
 		if _, ok := room.Clients[conn]; ok {
 			log.Printf("Client disconnected from room %s", roomID)
 			delete(room.Clients, conn)
-			UpdateParticipants(room)
+			count := len(room.Clients)
+			host := room.Host
+			room.mu.Unlock()
+			roomsMu.Unlock()
+
+			// Notify host outside of locks
+			if host != nil {
+				host.WriteJSON(Message{Type: "participants_count", Participants: count})
+			}
+			return
 		}
 
 		room.mu.Unlock()
 	}
+
+	roomsMu.Unlock()
 }
 
 func UpdateParticipants(room *Room) {
 	if room.Host != nil {
-		msg := Message{
+		room.Host.WriteJSON(Message{
 			Type:         "participants_count",
 			Participants: len(room.Clients),
-		}
-		room.Host.WriteJSON(msg)
+		})
 	}
 }

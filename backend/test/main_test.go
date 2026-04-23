@@ -166,7 +166,7 @@ func TestWebSocketFileChunk(t *testing.T) {
 		FileData:     encodedData,
 		FileName:     "test.txt",
 		FileType:     "text/plain",
-		FileSize:     len(fileData),
+		FileSize:     int64(len(fileData)),
 		ChunkIndex:   1,
 		TotalChunks:  1,
 		IsLastChunk:  true,
