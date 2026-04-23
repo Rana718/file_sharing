@@ -10,7 +10,6 @@ Welcome to the backend of **PeerDrop** - the engine that powers real-time, peer-
 - **Docker** 🐳 (Optional): Simplifies deployment with containerization if you prefer using containers.
 
 ## 📜 System Architecture
-
 ### Room Management
 - **Creation**: Automatically generates unique 6-digit room IDs to ensure quick and secure session creation. 🔢
 - **Joining**: Validates room existence, seamlessly managing participants as they join. 👥
