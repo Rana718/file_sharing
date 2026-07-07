@@ -36,11 +36,11 @@ type Message struct {
 }
 
 var (
-	rooms   = make(map[string]*Room)
-	roomsMu sync.RWMutex
+	rooms    = make(map[string]*Room)
+	roomsMu  sync.RWMutex
 	upgrader = websocket.Upgrader{
-		ReadBufferSize:  1024 * 64,
-		WriteBufferSize: 1024 * 64,
+		ReadBufferSize:  1024 * 1024 * 4, // 4 MB — matches ~1 MB chunk + Base64 overhead
+		WriteBufferSize: 1024 * 1024 * 4,
 		CheckOrigin:     func(r *http.Request) bool { return true },
 	}
 )

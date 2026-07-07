@@ -5,16 +5,16 @@ import ReceivedScreen from "./Screens/ReceivedScreen";
 import Navbar from "./components/Navbar";
 
 function App() {
-  return (
-    <>
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<HomeScreen />} />
-        <Route path="/send" element={<SendScreen />} />
-        <Route path="/receive" element={<ReceivedScreen/>} />
-      </Routes>
-    </>
-  );
+   return (
+      <>
+         <Navbar />
+         <Routes>
+            <Route path="/" element={<HomeScreen />} />
+            <Route path="/send" element={<SendScreen />} />
+            <Route path="/receive" element={<ReceivedScreen />} />
+         </Routes>
+      </>
+   );
 }
 
 export default App;

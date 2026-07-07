@@ -2,9 +2,10 @@ package utils
 
 import (
 	"fmt"
-	"github.com/shirou/gopsutil/v3/process"
 	"net/http"
 	"os"
+
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 func HelloHandler(w http.ResponseWriter, r *http.Request) {
